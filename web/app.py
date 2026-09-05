@@ -57,6 +57,19 @@ def _check_rate_limit(ip: str) -> bool:
 
 
 app = FastAPI(title="HallucinationNerd", description="Citation Hallucination Verification")
+
+# CORS: the static frontend (S3/CloudFront at hallucinationnerd.org) calls this API
+# cross-origin. Allowed origins are configurable via HVE_ALLOWED_ORIGINS (comma-
+# separated); defaults cover the production domain and local development.
+from fastapi.middleware.cors import CORSMiddleware
+_default_origins = "https://hallucinationnerd.org,https://www.hallucinationnerd.org,http://localhost:8000,http://127.0.0.1:8000"
+_allowed_origins = [o.strip() for o in os.getenv("HVE_ALLOWED_ORIGINS", _default_origins).split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
