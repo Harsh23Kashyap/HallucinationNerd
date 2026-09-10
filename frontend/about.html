@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About — HallucinationNerd</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white min-h-screen text-gray-800">
+
+    <!-- Header / nav -->
+    <header class="border-b border-gray-200">
+        <div class="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
+            <a href="index.html" class="text-xl font-bold text-gray-900">HallucinationNerd</a>
+            <nav class="text-sm text-gray-600 flex gap-5">
+                <a href="index.html" class="hover:text-gray-900">Home</a>
+                <a href="about.html" class="text-gray-900 font-medium">About</a>
+                <a href="mailto:shasha@cs.nyu.edu" class="hover:text-gray-900">Contact</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto px-6 py-10">
+
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">About Us</h1>
+        <p class="text-gray-700 leading-relaxed mb-8">
+            HallucinationNerd is a large language model-based tool that checks whether the
+            sources cited in a piece of text actually support the claims attributed to them.
+            Given any document with inline citations — a retrieval-augmented (RAG) answer, an
+            agentic system's report, or a research paper's related-work section — it breaks the
+            text into individual claims, retrieves the relevant passages from each cited source,
+            and reports, for every claim, whether the source supports it, partially supports it,
+            does not support it, or contradicts it. It works on PDFs, web pages, and plain text.
+        </p>
+
+        <h2 class="text-2xl font-semibold text-gray-900 mb-4">How It Works</h2>
+        <p class="text-gray-700 leading-relaxed mb-8">
+            HallucinationNerd runs a four-stage pipeline: it extracts atomic claims and their
+            citations, retrieves the cited source's content and locates the most relevant passage,
+            and then asks a structured LLM judge whether that source supports the claim, returning
+            a per-claim verdict with an evidence quote. For claims that carry no citation, it can
+            optionally search user-selected databases (PubMed, arXiv, Semantic Scholar) to find or
+            refute supporting evidence. A configurable strictness setting lets users trade precision
+            for recall.
+        </p>
+
+        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Meet Our Team</h2>
+        <div class="grid gap-5 sm:grid-cols-2 mb-10">
+
+            <div class="border border-gray-200 rounded-lg p-5">
+                <h3 class="text-lg font-semibold text-gray-900">Taranumpreet Kaur Wasu</h3>
+                <p class="text-sm text-gray-600 mt-1">Researcher</p>
+                <p class="text-sm text-gray-500 mt-1">Thapar Institute of Engineering and Technology, Patiala, India</p>
+            </div>
+
+            <div class="border border-gray-200 rounded-lg p-5">
+                <h3 class="text-lg font-semibold text-gray-900">Harsh Kashyap</h3>
+                <p class="text-sm text-gray-600 mt-1">Researcher</p>
+                <p class="text-sm text-gray-500 mt-1">Thapar Institute of Engineering and Technology, Patiala, India</p>
+            </div>
+
+            <div class="border border-gray-200 rounded-lg p-5">
+                <h3 class="text-lg font-semibold text-gray-900">Vishnu Chennur</h3>
+                <p class="text-sm text-gray-600 mt-1">Researcher</p>
+                <p class="text-sm text-gray-500 mt-1">Downingtown STEM Academy, Downingtown, PA, USA</p>
+            </div>
+
+            <div class="border border-gray-200 rounded-lg p-5">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <a href="https://cs.nyu.edu/~shasha/" class="hover:underline">Dennis Shasha</a>
+                </h3>
+                <p class="text-sm text-gray-600 mt-1">Professor of Computer Science</p>
+                <p class="text-sm text-gray-500 mt-1">Courant Institute of Mathematical Sciences, New York University, New York, USA</p>
+            </div>
+
+        </div>
+
+        <a href="index.html"
+           class="inline-block bg-blue-600 text-white font-medium py-3 px-6 rounded-md hover:bg-blue-700 transition-colors">
+            Try HallucinationNerd
+        </a>
+
+    </main>
+</body>
+</html>
