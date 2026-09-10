@@ -522,7 +522,7 @@ def _search_backup_reference(claim_text: str, question: str, question_id: str, c
             evidence_reference="",
             evidence_span_start=-1,
             evidence_span_end=-1,
-            reasoning=f"No citation provided. Database search failed: {e}",
+            reasoning=f"Backup database search failed: {e}",
         )
     
     if not search_results:
@@ -537,7 +537,7 @@ def _search_backup_reference(claim_text: str, question: str, question_id: str, c
             evidence_reference="",
             evidence_span_start=-1,
             evidence_span_end=-1,
-            reasoning="No citation provided. Searched approved databases but found no supporting reference.",
+            reasoning="Searched approved databases for backup evidence but found no supporting reference.",
         )
     
     # Verify the claim against search results (try top results until one supports)
@@ -589,7 +589,7 @@ def _search_backup_reference(claim_text: str, question: str, question_id: str, c
                 evidence_reference=f"BACKUP: {title} ({url})",
                 evidence_span_start=-1,
                 evidence_span_end=-1,
-                reasoning=f"No citation provided. Database search found: '{title}'. {result.get('reasoning', '')}",
+                reasoning=f"Backup database search found a supporting source: '{title}'. {result.get('reasoning', '')}",
             )
     
     # None of the search results supported the claim
@@ -604,7 +604,7 @@ def _search_backup_reference(claim_text: str, question: str, question_id: str, c
         evidence_reference="",
         evidence_span_start=-1,
         evidence_span_end=-1,
-        reasoning=f"No citation provided. Searched approved databases ({len(search_results)} results) but none supported this claim.",
+        reasoning=f"Searched approved databases ({len(search_results)} results) for backup evidence, but none supported this claim.",
     )
 
 

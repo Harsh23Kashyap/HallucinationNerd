@@ -23,7 +23,7 @@
     <!-- Top nav (About / Contact), matching the other Nerd sites -->
     <header class="border-b border-gray-200">
         <div class="px-6 py-3 flex items-center justify-between">
-            <a href="index.html" class="text-sm font-semibold text-gray-900">HallucinationNerd</a>
+            <a href="index.html" class="text-sm font-semibold text-gray-900">🤓 HallucinationNerd</a>
             <nav class="text-sm text-gray-600 flex gap-5">
                 <a href="index.html" class="hover:text-gray-900">Home</a>
                 <a href="about.html" class="hover:text-gray-900">About</a>
@@ -34,11 +34,12 @@
     <div class="flex flex-col md:flex-row flex-1">
         <!-- LEFT PANEL: Input -->
         <div class="w-full md:w-[420px] border-b md:border-b-0 md:border-r border-gray-200 p-6 md:p-8 flex flex-col">
-            <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2">HallucinationNerd</h1>
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2">🤓 HallucinationNerd</h1>
             <p class="text-gray-600 text-sm mb-6 md:mb-8">
                 Citation-level hallucination verification. Upload a document with inline citations — 
                 we'll check whether each cited source actually supports the claims attributed to it.
             </p>
+            <p class="text-xs text-gray-400 mb-6 md:mb-8">🧠 Reads the paper · 🔍 finds the cited passage · ✅ checks if it really supports the claim</p>
 
             <form id="uploadForm" class="flex flex-col flex-1">
                 <label class="text-sm font-semibold text-gray-700 mb-2">Document Format:</label>
@@ -114,20 +115,25 @@
                     <div class="spinner mb-4"></div>
                     <div class="absolute inset-0 spinner" style="animation-delay: -0.4s; opacity: 0.3;"></div>
                 </div>
-                <p class="text-gray-600 font-medium mt-4">Verifying citations...</p>
-                <p class="text-sm text-gray-400 mt-1" id="loadingMsg">Extracting text from document...</p>
-                <p class="text-xs text-gray-300 mt-3">This may take 1-2 minutes for papers with many citations</p>
+                <p class="text-gray-700 font-medium mt-4" id="loadingMsg">Analyzing your document…</p>
+                <p class="text-xs text-gray-400 mt-3">This runs in the background and can take 1–2 minutes for papers with many citations. Please keep this tab open.</p>
             </div>
 
             <!-- Summary bar -->
             <div id="summaryBar" class="hidden mb-6 fade-in">
-                <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 mb-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm font-medium text-gray-700" id="summaryText"></span>
+                <div class="p-4 bg-green-50 rounded-lg border border-green-200 mb-4">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-green-700 font-bold">✓ Analysis complete</span>
+                    </div>
+                    <div class="text-sm text-gray-700" id="summaryText"></div>
+                    <div class="flex items-center justify-between mt-3 mb-1">
+                        <span class="text-xs font-medium text-gray-500">Reliability score
+                            <span class="text-gray-400">(share of verifiable claims whose cited source supports them)</span>
+                        </span>
                         <span class="text-sm font-bold" id="reliabilityPct"></span>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                        <div id="reliabilityBar" class="h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="reliabilityBar" class="h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
                     </div>
                 </div>
 
@@ -170,6 +176,20 @@
                         <span class="text-gray-600" id="catInaccessibleRefs"></span>
                     </div>
                 </div>
+
+                <!-- Diagnostic-code legend -->
+                <details class="mt-4 text-xs text-gray-500 border border-gray-200 rounded p-3">
+                    <summary class="cursor-pointer font-medium text-gray-600">What do these result codes mean?</summary>
+                    <ul class="mt-2 space-y-1 list-disc list-inside">
+                        <li><b>Supported</b> — the cited source states or implies the claim.</li>
+                        <li><b>Partly Supported</b> — the source is on-topic and broadly consistent, but doesn't fully back the specific claim.</li>
+                        <li><b>Not Supported</b> — the cited source was read, but doesn't contain anything supporting the claim.</li>
+                        <li><b>Contradicted</b> — the cited source says the opposite of the claim.</li>
+                        <li><b>Inaccessible</b> — a citation is present, but the cited paper couldn't be retrieved (paywalled, dead link, or unresolvable), so it couldn't be checked.</li>
+                        <li><b>No Citation Provided</b> — the claim has no citation at all.</li>
+                        <li><b>Supporting Source Found / No Supporting Source</b> — for uncited claims only: a database search either did or didn't find a paper that supports the claim.</li>
+                    </ul>
+                </details>
             </div>
 
             <!-- Detailed claims list -->

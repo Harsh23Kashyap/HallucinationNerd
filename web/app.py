@@ -413,10 +413,16 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
         if not articles and unresolved_refs:
             unresolved_list = ", ".join(str(r) for r in unresolved_refs)
             note = (
-                f"Could not access any source for references [{unresolved_list}]. "
-                f"The cited sources may be behind a paywall, unavailable, or could not be resolved."
+                f"A citation is present ([{unresolved_list}]), but the cited source(s) could not be "
+                f"accessed (they may be behind a paywall, unavailable, or could not be resolved), "
+                f"so the claim could not be verified against them."
             )
-            reasoning = f"{verification.reasoning}\n{note}" if verification.verdict in ("BACKUP_FOUND", "BACKUP_PARTIAL", "NO_BACKUP_FOUND") else note
+            # Lead with the could-not-access explanation; append the backup-search
+            # outcome only if a backup search actually ran.
+            if verification.verdict in ("BACKUP_FOUND", "BACKUP_PARTIAL", "NO_BACKUP_FOUND"):
+                reasoning = f"{note}\n{verification.reasoning}"
+            else:
+                reasoning = note
         else:
             reasoning = verification.reasoning
 
