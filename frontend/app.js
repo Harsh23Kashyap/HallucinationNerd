@@ -53,19 +53,15 @@ form.addEventListener('submit', async (e) => {
     loadingState.classList.remove('hidden');
     submitBtn.disabled = true;
 
-    // Animated progress messages
+    // Honest status messages (this is one long request, not real per-claim progress)
     const loadingMsg = document.getElementById('loadingMsg');
     const stages = [
-        'Extracting text from document...',
-        'Identifying claims with citations...',
-        'Resolving cited references...',
-        'Downloading source papers from arXiv...',
-        'Verifying claims against sources...',
-        'Checking claim 1...',
-        'Checking claim 2...',
-        'Checking claim 3...',
-        'Still verifying (this can take 1-2 minutes for large papers)...',
-        'Almost done...',
+        'Reading the document…',
+        'Finding claims and their citations…',
+        'Fetching the cited sources…',
+        'Checking each claim against its source…',
+        'Still working — large papers with many citations take a little longer…',
+        'Almost there…',
     ];
     let stageIdx = 0;
     const progressInterval = setInterval(() => {
@@ -73,7 +69,7 @@ form.addEventListener('submit', async (e) => {
             loadingMsg.textContent = stages[stageIdx];
             stageIdx++;
         }
-    }, 8000);
+    }, 10000);
 
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
@@ -116,11 +112,11 @@ function renderResults(data) {
     // Summary bar
     summaryBar.classList.remove('hidden');
     document.getElementById('summaryText').textContent =
-        `${s.total_claims} claims analyzed from "${data.filename}"`;
+        `${s.total_claims} claim${s.total_claims === 1 ? '' : 's'} analyzed from "${data.filename}". See the breakdown below.`;
 
     const pct = s.reliability_percent;
     const pctEl = document.getElementById('reliabilityPct');
-    pctEl.textContent = `${pct}% reliable`;
+    pctEl.textContent = `${pct}%`;
     pctEl.className = `text-sm font-bold ${pct >= 80 ? 'text-green-600' : pct >= 50 ? 'text-yellow-600' : 'text-red-600'}`;
 
     const bar = document.getElementById('reliabilityBar');
