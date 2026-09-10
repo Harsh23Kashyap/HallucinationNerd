@@ -19,8 +19,19 @@
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="bg-white min-h-screen">
-    <div class="flex flex-col md:flex-row min-h-screen">
+<body class="bg-white min-h-screen flex flex-col">
+    <!-- Top nav (About / Contact), matching the other Nerd sites -->
+    <header class="border-b border-gray-200">
+        <div class="px-6 py-3 flex items-center justify-between">
+            <a href="index.html" class="text-sm font-semibold text-gray-900">HallucinationNerd</a>
+            <nav class="text-sm text-gray-600 flex gap-5">
+                <a href="index.html" class="hover:text-gray-900">Home</a>
+                <a href="about.html" class="hover:text-gray-900">About</a>
+                <a href="mailto:shasha@cs.nyu.edu" class="hover:text-gray-900">Contact</a>
+            </nav>
+        </div>
+    </header>
+    <div class="flex flex-col md:flex-row flex-1">
         <!-- LEFT PANEL: Input -->
         <div class="w-full md:w-[420px] border-b md:border-b-0 md:border-r border-gray-200 p-6 md:p-8 flex flex-col">
             <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2">HallucinationNerd</h1>
