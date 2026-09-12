@@ -120,8 +120,10 @@ def _parse_single_reference(entry_text: str) -> dict:
         "pmid": "",
     }
 
-    # Extract arXiv ID
-    arxiv_match = re.search(r'arXiv[:\s]*(\d{4}\.\d{4,5})', entry_text, re.IGNORECASE)
+    # Extract arXiv ID — handle "arXiv:1706.03762", "arXiv preprint arXiv:...",
+    # and the very common "CoRR, abs/1409.0473" / "abs/1409.0473" forms, plus a
+    # trailing version suffix ("1706.03762v5").
+    arxiv_match = re.search(r'(?:arXiv[:\s]*|abs/)(\d{4}\.\d{4,5})(?:v\d+)?', entry_text, re.IGNORECASE)
     if arxiv_match:
         info["arxiv_id"] = arxiv_match.group(1)
 
@@ -130,7 +132,7 @@ def _parse_single_reference(entry_text: str) -> dict:
     if doi_match:
         info["doi"] = doi_match.group(1).rstrip('.')
 
-    # Extract URL
+    # Extract URL (skip bare arxiv.org/abs URLs — the arXiv ID above handles those)
     url_match = re.search(r'(https?://[^\s,;>]+)', entry_text)
     if url_match:
         info["url"] = url_match.group(1).rstrip('.')
@@ -145,22 +147,34 @@ def _parse_single_reference(entry_text: str) -> dict:
     if year_match:
         info["year"] = year_match.group(1) or year_match.group(2)
 
-    # Extract title (heuristic: usually after ": " in CS bib entries, or in quotes)
-    title_match = re.search(r'["""](.+?)["""]', entry_text)
-    if title_match:
-        info["title"] = title_match.group(1)
+    # Extract title. Build a cleaned string first: strip identifiers and venue
+    # tails so the title heuristic doesn't grab the arXiv number (the old bug
+    # produced titles like "1607.06450, 2016.").
+    clean = entry_text
+    clean = re.sub(r'arXiv[:\s]*\d{4}\.\d{4,5}(?:v\d+)?', ' ', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\barXiv\s+preprint\b', ' ', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\bCoRR\b.*', ' ', clean)              # drop CoRR venue tail
+    clean = re.sub(r'\babs/\d{4}\.\d{4,5}', ' ', clean)
+    clean = re.sub(r'https?://\S+', ' ', clean)
+    clean = re.sub(r'10\.\d{4,}/\S+', ' ', clean)
+    clean = re.sub(r'\s+', ' ', clean).strip()
+
+    quoted = re.search(r'["\u201c\u201d\u2018\u2019](.+?)["\u201c\u201d\u2018\u2019]', entry_text)
+    if quoted and len(quoted.group(1)) > 6:
+        info["title"] = quoted.group(1).strip()
     else:
-        # CS format: "Authors.: Title. Venue (Year)" — title follows the colon
-        colon_match = re.search(r':\s*(.+?)(?:\.\s|$)', entry_text)
-        if colon_match and len(colon_match.group(1)) > 10:
-            info["title"] = colon_match.group(1).strip()
-        else:
-            # Try: text between first period and second period (often the title)
-            parts = entry_text.split('.')
-            if len(parts) >= 2:
-                candidate = parts[1].strip() if len(parts[0]) < 60 else parts[0].strip()
-                if 10 < len(candidate) < 200:
-                    info["title"] = candidate
+        # CS format: "Authors. Title. Venue, Year." The authors are segment 0
+        # (they contain commas / "and"); the title is the next segment.
+        segs = [s.strip() for s in clean.split('.') if len(s.strip()) > 0]
+        cand = ""
+        if segs:
+            if len(segs) >= 2 and ("," in segs[0] or " and " in segs[0].lower()):
+                cand = segs[1]
+            else:
+                cand = segs[0]
+        # Reject candidates that are just numbers/years or too short/long.
+        if cand and 8 < len(cand) < 250 and not re.fullmatch(r'[\d,\s]+', cand):
+            info["title"] = cand
 
     return info
 
