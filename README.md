@@ -120,14 +120,14 @@ python statistical_tests/Diff2MeanConf.py   # bootstrap confidence interval
 ```
 @article{wasu2026hallucinationnerd,
   title={HallucinationNerd: A Framework and Tool for Detecting Citation Hallucinations in Synopsis-Generating Systems},
-  author={Wasu, Taranumpreet Kaur and Kashyap, Harsh and Chennur, Vishnu and Shasha, Dennis},
+  author={Wasu, Taranum and Kashyap, Harsh and Chennur, Vishnu and Shasha, Dennis},
   year={2026}
 }
 ```
 
 ## Authors
 
-- **Taranumpreet Kaur Wasu** — Thapar Institute of Engineering and Technology, Patiala, India
+- **Taranum Wasu** — Thapar Institute of Engineering and Technology, Patiala, India
 - **Harsh Kashyap** — Thapar Institute of Engineering and Technology, Patiala, India
 - **Vishnu Chennur** — Downingtown STEM Academy, Downingtown, PA, USA
 - **Dennis Shasha** — Department of Computer Science, New York University, New York, USA
