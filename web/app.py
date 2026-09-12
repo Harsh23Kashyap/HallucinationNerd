@@ -447,17 +447,6 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
         else:
             reasoning = verification.reasoning
 
-        # Wrong-source guard: if content WAS resolved but is topically unrelated
-        # to the claim, do not assert a confident NOT_SUPPORTED/CONTRADICTED off a
-        # mis-fetched source — mark it inaccessible instead.
-        if articles and verdict_out in ("NOT_SUPPORTED", "CONTRADICTED") and _looks_off_topic(claim_text, articles):
-            reflist = ", ".join(str(r) for r in cited_refs)
-            reasoning = (
-                f"A citation is present ([{reflist}]), but the source retrieved for it did not "
-                f"appear to match the citation, so the claim could not be reliably verified against it."
-            )
-            verdict_out = "INACCESSIBLE"
-
         results.append({
             "claim": claim_text,
             "cited_refs": cited_refs,
