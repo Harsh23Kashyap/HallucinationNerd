@@ -236,6 +236,8 @@ function renderResults(data) {
             verdictBadge = { label: `◐ Backup Source — Partial Support${claim.backup_source ? ' — ' + claim.backup_source : ''}`, class: 'badge-partial' };
         } else if (claim.verdict === 'NO_BACKUP_FOUND') {
             verdictBadge = { label: '✗ No Backup Source', class: 'badge-no-backup' };
+        } else if (claim.verdict === 'INACCESSIBLE') {
+            verdictBadge = { label: '⚠ Source Could Not Be Accessed', class: 'badge-unverifiable' };
         } else if (noRefs) {
             verdictBadge = { label: '— No Citation Provided', class: 'badge-no-citation' };
         } else {
@@ -280,6 +282,7 @@ function getVerdictClass(verdict) {
         case 'BACKUP_FOUND': return 'verdict-backup-found';
         case 'BACKUP_PARTIAL': return 'verdict-partial';
         case 'NO_BACKUP_FOUND': return 'verdict-no-backup';
+        case 'INACCESSIBLE': return 'verdict-unverifiable';
         default: return 'verdict-unverifiable';
     }
 }

@@ -394,8 +394,25 @@ def _search_and_fetch(query: str) -> Optional[str]:
         return None
 
 
+def _title_matches(query: str, title: str, min_overlap: float = 0.5) -> bool:
+    """True only if the candidate title genuinely matches the reference title.
+
+    Guards against arXiv's top-hit returning an unrelated paper for a reference
+    we can't precisely resolve (e.g. matching an enterprise-control citation to
+    'Cosmopolitan Sexualities'). Requires that at least `min_overlap` of the
+    reference's significant words appear in the candidate title.
+    """
+    def toks(s):
+        return {w for w in re.sub(r'[^\w\s]', ' ', (s or '').lower()).split() if len(w) > 3}
+    q, t = toks(query), toks(title)
+    if not q:
+        return False
+    return (len(q & t) / len(q)) >= min_overlap
+
+
 def _search_arxiv_by_title(query: str) -> Optional[str]:
-    """Search arXiv API by title and download the full PDF if found. No rate limit."""
+    """Search arXiv API by title and download the full PDF if the hit actually
+    matches the reference title. No rate limit."""
     try:
         import urllib.parse
         # arXiv API search
@@ -414,11 +431,18 @@ def _search_arxiv_by_title(query: str) -> Optional[str]:
             return None
 
         entry = entries[0]
+
+        # Relevance guard: only accept the hit if its title matches the reference.
+        title_el = entry.find('atom:title', ns)
+        cand_title = title_el.text.strip() if title_el is not None else ""
+        if not _title_matches(query, cand_title):
+            return None
+
         # Get the arXiv ID from the entry
         entry_id = entry.find('atom:id', ns)
         if entry_id is None:
             return None
-        
+
         # Extract arXiv ID from URL like http://arxiv.org/abs/2301.12345v1
         arxiv_id_match = re.search(r'(\d{4}\.\d{4,5})', entry_id.text)
         if arxiv_id_match:
@@ -429,12 +453,10 @@ def _search_arxiv_by_title(query: str) -> Optional[str]:
                 return full_text
 
         # Fallback: return title + abstract from the API response
-        title_el = entry.find('atom:title', ns)
         summary_el = entry.find('atom:summary', ns)
-        title = title_el.text.strip() if title_el is not None else ""
         abstract = summary_el.text.strip() if summary_el is not None else ""
         if abstract:
-            return f"Title: {title}\n\nAbstract: {abstract}"
+            return f"Title: {cand_title}\n\nAbstract: {abstract}"
     except Exception:
         pass
     return None

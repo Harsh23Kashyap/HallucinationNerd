@@ -389,13 +389,14 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
         # (Dennis's 6 Aug directive: "HVE would find hallucinations when
         # references are given and provide references for unverifiable
         # statements").
+        use_backup = bool(databases or custom_database)
         verification = verify_claim_per_ref(
             claim={"claim_text": claim_text, "cited_refs": cited_refs},
             articles=articles,
             question="",  # website path doesn't have an original question
             question_id=hashlib.md5(claim_text.encode()).hexdigest()[:12],
             claim_idx=1,
-            search_backup=True,
+            search_backup=use_backup,
         )
         per_ref = getattr(verification, "per_ref_verdicts", [])
 
@@ -410,6 +411,7 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
         # When no ref resolved at all, surface the unresolved_refs list and
         # indicate the citation couldn't be reached. The engine has already
         # dispatched to search-backup if the verdict is BACKUP_FOUND/NO_BACKUP_FOUND.
+        verdict_out = verification.verdict
         if not articles and unresolved_refs:
             unresolved_list = ", ".join(str(r) for r in unresolved_refs)
             note = (
@@ -417,11 +419,14 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
                 f"accessed (they may be behind a paywall, unavailable, or could not be resolved), "
                 f"so the claim could not be verified against them."
             )
-            # Lead with the could-not-access explanation; append the backup-search
-            # outcome only if a backup search actually ran.
-            if verification.verdict in ("BACKUP_FOUND", "BACKUP_PARTIAL", "NO_BACKUP_FOUND"):
+            # A citation IS present, so this is NOT "no backup source" — it is an
+            # inaccessible source. Label it clearly. Only surface a backup result
+            # when the user actually enabled backup databases AND one supported it.
+            if use_backup and verification.verdict in ("BACKUP_FOUND", "BACKUP_PARTIAL"):
+                verdict_out = verification.verdict
                 reasoning = f"{note}\n{verification.reasoning}"
             else:
+                verdict_out = "INACCESSIBLE"
                 reasoning = note
         else:
             reasoning = verification.reasoning
@@ -429,7 +434,7 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
         results.append({
             "claim": claim_text,
             "cited_refs": cited_refs,
-            "verdict": verification.verdict,
+            "verdict": verdict_out,
             "confidence": verification.confidence,
             "evidence_quote": verification.evidence_quote,
             "evidence_reference": verification.evidence_reference,
@@ -446,10 +451,13 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
     not_supported = sum(1 for r in results if r["verdict"] == "NOT_SUPPORTED")
     contradicted = sum(1 for r in results if r["verdict"] == "CONTRADICTED")
     unverifiable = sum(1 for r in results if r["verdict"] == "UNVERIFIABLE")
+    inaccessible = sum(1 for r in results if r["verdict"] == "INACCESSIBLE")
     backup_found = sum(1 for r in results if r["verdict"] == "BACKUP_FOUND")
     no_backup_found = sum(1 for r in results if r["verdict"] == "NO_BACKUP_FOUND")
 
-    verifiable = total - unverifiable
+    # A claim whose cited source could not be accessed is not "verifiable" — it has
+    # no accessible source to check against — so exclude it from the denominator.
+    verifiable = total - unverifiable - inaccessible
     reliability_pct = (supported + partial + backup_found) / verifiable * 100 if verifiable > 0 else 0
     # H5 fix: also expose the supported-only precision. PARTIALLY is
     # ambiguous (the claim is only partially supported by the cited source),
@@ -466,6 +474,7 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
             "not_supported": not_supported,
             "contradicted": contradicted,
             "unverifiable": unverifiable,
+            "inaccessible": inaccessible,
             "backup_found": backup_found,
             "no_backup_found": no_backup_found,
             "reliability_percent": round(reliability_pct, 1),  # includes PARTIALLY
