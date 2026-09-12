@@ -400,8 +400,16 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
         # references are given and provide references for unverifiable
         # statements").
         use_backup = bool(databases or custom_database)
+        # IMPORTANT: verify_claim_per_ref looks up each ref's article by
+        # POSITION (articles[ref_num-1]). `articles` here is a COMPACT list of
+        # only the refs that resolved, so we must pass POSITIONAL ref numbers
+        # (1..len(articles)) that line up with it — passing the original ref
+        # numbers (e.g. [2] with a 1-element list) makes it read past the end
+        # and wrongly report "ref not in retrieved set". We remap the per-ref
+        # verdicts back to the original ref numbers afterward.
+        pos_cited_refs = list(range(1, len(articles) + 1))
         verification = verify_claim_per_ref(
-            claim={"claim_text": claim_text, "cited_refs": cited_refs},
+            claim={"claim_text": claim_text, "cited_refs": pos_cited_refs},
             articles=articles,
             question="",  # website path doesn't have an original question
             question_id=hashlib.md5(claim_text.encode()).hexdigest()[:12],
@@ -410,13 +418,11 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
         )
         per_ref = getattr(verification, "per_ref_verdicts", [])
 
-        # Map per-ref verdicts back to the original ref numbers (resolved_ref_keys
-        # are 1-indexed, articles are 0-indexed; we just translate the article idx
-        # to the original ref num).
+        # Map positional ref numbers (1..N over the resolved articles) back to
+        # the claim's original ref numbers.
         ref_idx_to_num = {i + 1: resolved_ref_keys[i] for i in range(len(resolved_ref_keys))}
         for entry in per_ref:
-            if entry.get("ref_num") in (None, 0):
-                entry["ref_num"] = ref_idx_to_num.get(entry.get("ref_num"), entry.get("ref_num"))
+            entry["ref_num"] = ref_idx_to_num.get(entry.get("ref_num"), entry.get("ref_num"))
 
         # When no ref resolved at all, surface the unresolved_refs list and
         # indicate the citation couldn't be reached. The engine has already
