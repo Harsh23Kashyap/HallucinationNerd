@@ -59,9 +59,9 @@ def test_web_per_ref_for_fully_resolvable_claim(mock_openai, web_app_path, tmp_p
 def test_web_per_ref_for_unresolvable_claim(mock_openai, web_app_path, tmp_path, monkeypatch):
     """A claim with all refs unresolvable: dispatches to search-backup.
 
-    With search_backup=True (the new default), an unresolvable cited claim
-    no longer returns UNVERIFIABLE — it dispatches to PubMed and returns
-    BACKUP_FOUND/NO_BACKUP_FOUND instead. The unresolved_refs list still
+    With no backup databases selected, an unresolvable cited claim is labeled
+    INACCESSIBLE ("a citation is present, but the source could not be
+    accessed") rather than NO_BACKUP_FOUND. The unresolved_refs list still
     appears in the response.
     """
     paper_text = (
@@ -82,23 +82,27 @@ def test_web_per_ref_for_unresolvable_claim(mock_openai, web_app_path, tmp_path,
 
     result = web_app._run_verification(str(paper_file), "test_paper.txt", ".txt", "auto")
     claim = result["claims"][0]
-    # No PubMed result -> NO_BACKUP_FOUND (the engine fallback after search-backup)
-    assert claim["verdict"] in ("NO_BACKUP_FOUND", "BACKUP_FOUND", "UNVERIFIABLE")
+    # No databases selected -> a cited-but-unresolvable claim is labeled
+    # INACCESSIBLE (citation present, source could not be accessed), not
+    # NO_BACKUP_FOUND (which would falsely imply it had no citation).
+    assert claim["verdict"] == "INACCESSIBLE"
     assert claim["citation_exists"] is False
     assert claim["unresolved_refs"] == [1]
-    # per_ref_verdicts records the unresolvable ref as UNVERIFIABLE
-    assert len(claim["per_ref_verdicts"]) == 1
-    assert claim["per_ref_verdicts"][0]["verdict"] == "UNVERIFIABLE"
+    # Nothing resolved, so there are no per-ref verdicts; the unresolved ref is
+    # surfaced via unresolved_refs above.
+    assert claim["per_ref_verdicts"] == []
 
     result = web_app._run_verification(str(paper_file), "test_paper.txt", ".txt", "auto")
     claim = result["claims"][0]
-    # No PubMed result -> NO_BACKUP_FOUND (the engine fallback after search-backup)
-    assert claim["verdict"] in ("NO_BACKUP_FOUND", "BACKUP_FOUND", "UNVERIFIABLE")
+    # No databases selected -> a cited-but-unresolvable claim is labeled
+    # INACCESSIBLE (citation present, source could not be accessed), not
+    # NO_BACKUP_FOUND (which would falsely imply it had no citation).
+    assert claim["verdict"] == "INACCESSIBLE"
     assert claim["citation_exists"] is False
     assert claim["unresolved_refs"] == [1]
-    # per_ref_verdicts records the unresolvable ref as UNVERIFIABLE
-    assert len(claim["per_ref_verdicts"]) == 1
-    assert claim["per_ref_verdicts"][0]["verdict"] == "UNVERIFIABLE"
+    # Nothing resolved, so there are no per-ref verdicts; the unresolved ref is
+    # surfaced via unresolved_refs above.
+    assert claim["per_ref_verdicts"] == []
 
 
 def test_web_per_ref_unverifiable_does_not_count_in_reliability(mock_openai, web_app_path, tmp_path, monkeypatch):
@@ -149,8 +153,8 @@ def test_web_per_ref_unverifiable_does_not_count_in_reliability(mock_openai, web
     assert result["summary"]["total_claims"] == 2
     # First claim (ref [1] resolved, SUPPORTED)
     assert result["claims"][0]["verdict"] == "SUPPORTED"
-    # Second claim (ref [2] paywalled, dispatches to search-backup -> NO_BACKUP_FOUND)
-    assert result["claims"][1]["verdict"] in ("NO_BACKUP_FOUND", "BACKUP_FOUND", "UNVERIFIABLE")
+    # Second claim (ref [2] paywalled, no databases -> INACCESSIBLE)
+    assert result["claims"][1]["verdict"] == "INACCESSIBLE"
     # The key invariant: reliability denominator is the verifiable count
     # (claims that have a real source), not the total.
     # The first claim has a real source (counts as verifiable), the second
