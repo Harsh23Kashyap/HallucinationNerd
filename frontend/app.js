@@ -13,16 +13,22 @@ const errorState = document.getElementById('errorState');
 
 // File upload handling
 dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+    }
+});
 dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
-    dropZone.classList.add('border-blue-400', 'bg-blue-50');
+    dropZone.classList.add('dragover');
 });
 dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+    dropZone.classList.remove('dragover');
 });
 dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
-    dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+    dropZone.classList.remove('dragover');
     if (e.dataTransfer.files.length) {
         fileInput.files = e.dataTransfer.files;
         fileLabel.textContent = e.dataTransfer.files[0].name;
@@ -39,7 +45,7 @@ form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     if (!fileInput.files.length) {
-        alert('Please select a file to upload.');
+        showError('Please select a file to upload.');
         return;
     }
 
@@ -113,19 +119,39 @@ function showError(msg) {
 function renderResults(data) {
     const s = data.summary;
 
-    // Summary bar
+    emptyState.classList.add('hidden');
+
+    // Summary
     summaryBar.classList.remove('hidden');
     document.getElementById('summaryText').textContent =
         `${s.total_claims} claims analyzed from "${data.filename}"`;
+    document.getElementById('summaryCount').textContent = s.total_claims;
+    document.getElementById('summaryFile').textContent = data.filename;
 
     const pct = s.reliability_percent;
+    const tone = pct >= 80 ? 'tone-good' : pct >= 50 ? 'tone-mid' : 'tone-bad';
     const pctEl = document.getElementById('reliabilityPct');
-    pctEl.textContent = `${pct}% reliable`;
-    pctEl.className = `text-sm font-bold ${pct >= 80 ? 'text-green-600' : pct >= 50 ? 'text-yellow-600' : 'text-red-600'}`;
+    pctEl.className = `reliability-num ${tone}`;
+    pctEl.innerHTML = `${pct}%<small>reliable</small>`;
 
     const bar = document.getElementById('reliabilityBar');
     bar.style.width = `${pct}%`;
-    bar.className = `h-2.5 rounded-full transition-all duration-500 ${pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`;
+    bar.className = `meter-fill ${tone}`;
+
+    // Verdict counts -> stat grid (real numbers, no blank bars)
+    let nSupported = 0, nPartial = 0, nNotSupported = 0, nUncited = 0;
+    data.claims.forEach(c => {
+        const noRefs = (!c.cited_refs || c.cited_refs.length === 0);
+        if (noRefs) { nUncited++; return; }
+        if (c.verdict === 'SUPPORTED') nSupported++;
+        else if (c.verdict === 'PARTIALLY_SUPPORTED') nPartial++;
+        else if (c.verdict === 'NOT_SUPPORTED' || c.verdict === 'CONTRADICTED') nNotSupported++;
+    });
+    document.getElementById('statTotal').textContent = data.claims.length;
+    document.getElementById('statSupported').textContent = nSupported;
+    document.getElementById('statPartial').textContent = nPartial;
+    document.getElementById('statNotSupported').textContent = nNotSupported;
+    document.getElementById('statUncited').textContent = nUncited;
 
     // Build categorized report (professor's format)
     const existingRefs = new Set();
@@ -170,7 +196,7 @@ function renderResults(data) {
             const el = document.getElementById(id);
             el.classList.remove('hidden');
             const sorted = [...refsSet].sort((a, b) => a - b);
-            document.getElementById(id + 'Refs').textContent = ' ' + sorted.map(r => `[${r}]`).join(', ');
+            document.getElementById(id + 'Refs').textContent = sorted.map(r => `[${r}]`).join(', ');
         }
     }
     showCat('catExisting', existingRefs);
@@ -182,17 +208,17 @@ function renderResults(data) {
     if (noCitationCount > 0) {
         document.getElementById('catNoCitation').classList.remove('hidden');
         document.getElementById('catNoCitationRefs').textContent =
-            ` ${noCitationCount} claim${noCitationCount === 1 ? '' : 's'} with no inline citation`;
+            `${noCitationCount} claim${noCitationCount === 1 ? '' : 's'} with no inline citation`;
     }
     if (backupFoundCount > 0) {
         document.getElementById('catBackupFound').classList.remove('hidden');
         document.getElementById('catBackupFoundRefs').textContent =
-            ` ${backupFoundCount} uncited claim${backupFoundCount === 1 ? '' : 's'} matched to a supporting source`;
+            `${backupFoundCount} uncited claim${backupFoundCount === 1 ? '' : 's'} matched to a supporting source`;
     }
     if (noBackupCount > 0) {
         document.getElementById('catNoBackup').classList.remove('hidden');
         document.getElementById('catNoBackupRefs').textContent =
-            ` ${noBackupCount} uncited claim${noBackupCount === 1 ? '' : 's'} with no supporting source found`;
+            `${noBackupCount} uncited claim${noBackupCount === 1 ? '' : 's'} with no supporting source found`;
     }
 
     // Show detailed claims header
@@ -201,39 +227,42 @@ function renderResults(data) {
     // Render each claim card
     data.claims.forEach((claim, i) => {
         const card = document.createElement('div');
-        card.className = `p-4 rounded-lg fade-in ${getVerdictClass(claim.verdict)}`;
+        card.className = `claim-card fade-in ${getVerdictClass(claim.verdict)}`;
         card.style.animationDelay = `${i * 0.05}s`;
 
         const noRefs = (!claim.cited_refs || claim.cited_refs.length === 0);
         let verdictBadge;
         if (claim.verdict === 'BACKUP_FOUND') {
-            verdictBadge = { label: `✓ Backup Source Found${claim.backup_source ? ' — ' + claim.backup_source : ''}`, class: 'bg-teal-100 text-teal-700' };
+            verdictBadge = { label: `✓ Backup Source Found${claim.backup_source ? ' — ' + claim.backup_source : ''}`, class: 'badge-backup-found' };
         } else if (claim.verdict === 'NO_BACKUP_FOUND') {
-            verdictBadge = { label: '✗ No Backup Source', class: 'bg-orange-100 text-orange-700' };
+            verdictBadge = { label: '✗ No Backup Source', class: 'badge-no-backup' };
         } else if (noRefs) {
-            verdictBadge = { label: '— No Citation Provided', class: 'bg-purple-100 text-purple-700' };
+            verdictBadge = { label: '— No Citation Provided', class: 'badge-no-citation' };
         } else {
             verdictBadge = getVerdictBadge(claim.verdict);
         }
-        const confidence = claim.confidence ? `${Math.round(claim.confidence * 100)}%` : '';
+        const confPct = claim.confidence ? Math.round(claim.confidence * 100) : 0;
+        const confHtml = claim.confidence
+            ? `<span class="conf"><span class="conf-track"><span class="conf-fill" style="width:${confPct}%"></span></span>${confPct}% conf.</span>`
+            : '';
 
         card.innerHTML = `
-            <div class="flex items-start justify-between mb-2">
-                <span class="text-xs font-medium px-2 py-0.5 rounded ${verdictBadge.class}">${verdictBadge.label}</span>
-                ${confidence ? `<span class="text-xs text-gray-400">${confidence} confidence</span>` : ''}
+            <div class="claim-top">
+                <span class="badge ${verdictBadge.class}">${verdictBadge.label}</span>
+                ${confHtml}
             </div>
-            <p class="text-sm text-gray-800 mb-2">"${escapeHtml(claim.claim)}"</p>
-            ${claim.cited_refs && claim.cited_refs.length ? `<p class="text-xs text-gray-500 mb-2">Cited: [${claim.cited_refs.join(', ')}]</p>` : ''}
+            <p class="claim-text">"${escapeHtml(claim.claim)}"</p>
+            ${claim.cited_refs && claim.cited_refs.length ? `<p class="claim-refs">Cited: [${claim.cited_refs.join(', ')}]</p>` : ''}
             ${claim.evidence_quote ? `
-                <details class="mt-2">
-                    <summary class="text-xs text-blue-600 cursor-pointer hover:underline">Show evidence</summary>
-                    <blockquote class="mt-1 pl-3 border-l-2 border-gray-300 text-xs text-gray-600 italic">${escapeHtml(claim.evidence_quote)}</blockquote>
+                <details>
+                    <summary>Show evidence</summary>
+                    <blockquote>${escapeHtml(claim.evidence_quote)}</blockquote>
                 </details>
             ` : ''}
             ${claim.reasoning ? `
-                <details class="mt-1">
-                    <summary class="text-xs text-gray-500 cursor-pointer hover:underline">Reasoning</summary>
-                    <p class="mt-1 text-xs text-gray-500">${escapeHtml(claim.reasoning)}</p>
+                <details class="secondary">
+                    <summary>Reasoning</summary>
+                    <p class="reasoning">${escapeHtml(claim.reasoning)}</p>
                 </details>
             ` : ''}
         `;
@@ -256,11 +285,11 @@ function getVerdictClass(verdict) {
 
 function getVerdictBadge(verdict) {
     switch (verdict) {
-        case 'SUPPORTED': return { label: '✓ Verified', class: 'bg-green-100 text-green-700' };
-        case 'PARTIALLY_SUPPORTED': return { label: '◐ Partially Verified', class: 'bg-yellow-100 text-yellow-700' };
-        case 'NOT_SUPPORTED': return { label: '✗ Not Supported', class: 'bg-red-100 text-red-700' };
-        case 'CONTRADICTED': return { label: '⚠ Contradicted', class: 'bg-red-200 text-red-800' };
-        default: return { label: '? Could Not Verify', class: 'bg-gray-100 text-gray-600' };
+        case 'SUPPORTED': return { label: '✓ Verified', class: 'badge-supported' };
+        case 'PARTIALLY_SUPPORTED': return { label: '◐ Partially Verified', class: 'badge-partial' };
+        case 'NOT_SUPPORTED': return { label: '✗ Not Supported', class: 'badge-not-supported' };
+        case 'CONTRADICTED': return { label: '⚠ Contradicted', class: 'badge-contradicted' };
+        default: return { label: '? Could Not Verify', class: 'badge-unverifiable' };
     }
 }
 
