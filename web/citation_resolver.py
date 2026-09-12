@@ -648,8 +648,11 @@ def resolve_and_fetch_all(full_text: str, cited_refs: list) -> dict:
                 try:
                     content = future.result()
                     results[ref_key_str] = content
-                    # Cache it with timestamp for TTL
-                    _source_cache[cache_key] = (now, content)
+                    # Cache ONLY successful fetches. Caching None poisons the
+                    # cache: a single transient failure (e.g. arXiv rate-limit)
+                    # would otherwise stick for the whole TTL and never retry.
+                    if content:
+                        _source_cache[cache_key] = (now, content)
                 except Exception:
                     results[ref_key_str] = None
 
