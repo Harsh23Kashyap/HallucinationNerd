@@ -68,8 +68,15 @@ def extract_cited_claims_from_text(text: str, max_claims: int = 200) -> List[dic
     ref_start = _find_references_start(text)
     body = text[:ref_start] if ref_start else text
 
+    # Reunite sentences fragmented across newlines. HTML extraction with
+    # strip=True puts every text node on its own line, and PDF extraction wraps
+    # lines mid-sentence; both shatter the sentence splitter. Collapse single
+    # newlines to spaces so full sentences survive (paragraph breaks become one
+    # space too, which is fine for sentence-boundary splitting on .!?).
+    body = re.sub(r'[ \t]*\n+[ \t]*', ' ', body)
+
     # Citation pattern: [1] or [1, 2] or [1,2,3] or [1-3]
-    cite_pattern = re.compile(r'\[(\d+(?:[\s,\-]+\d+)*)\]')
+    cite_pattern = re.compile(r'\[\s*(\d+(?:[\s,\-]+\d+)*)\s*\]')  # tolerate '[ 13 ]' (ar5iv HTML)
 
     # H2 fix: protect common academic abbreviations from being treated as
     # sentence boundaries. The naive `(?<=[.!?])\s+(?=[A-Z\[])` would
@@ -218,7 +225,7 @@ def split_multi_ref_claims(claims: List[dict], max_refs_per_claim: int = 3) -> L
     import re
     
     result = []
-    cite_pattern = re.compile(r'\[(\d+(?:[\s,]+\d+)*)\]')
+    cite_pattern = re.compile(r'\[\s*(\d+(?:[\s,]+\d+)*)\s*\]')  # tolerate '[ 13 ]' (ar5iv HTML)
     
     for claim in claims:
         refs = claim.get("cited_refs", [])
