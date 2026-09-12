@@ -424,6 +424,11 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
         for entry in per_ref:
             entry["ref_num"] = ref_idx_to_num.get(entry.get("ref_num"), entry.get("ref_num"))
 
+        # The engine builds reasoning like "strongest ref [1]" using POSITIONAL
+        # ref numbers; remap to the claim's original ref numbers for display.
+        def _remap_refs_in_text(txt):
+            return re.sub(r"ref \[(\d+)\]", lambda m: "ref [%s]" % ref_idx_to_num.get(int(m.group(1)), m.group(1)), txt)
+
         # When no ref resolved at all, surface the unresolved_refs list and
         # indicate the citation couldn't be reached. The engine has already
         # dispatched to search-backup if the verdict is BACKUP_FOUND/NO_BACKUP_FOUND.
@@ -440,12 +445,12 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
             # when the user actually enabled backup databases AND one supported it.
             if use_backup and verification.verdict in ("BACKUP_FOUND", "BACKUP_PARTIAL"):
                 verdict_out = verification.verdict
-                reasoning = f"{note}\n{verification.reasoning}"
+                reasoning = f"{note}\n" + _remap_refs_in_text(verification.reasoning)
             else:
                 verdict_out = "INACCESSIBLE"
                 reasoning = note
         else:
-            reasoning = verification.reasoning
+            reasoning = _remap_refs_in_text(verification.reasoning)
 
         results.append({
             "claim": claim_text,

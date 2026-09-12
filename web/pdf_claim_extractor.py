@@ -236,32 +236,37 @@ def split_multi_ref_claims(claims: List[dict], max_refs_per_claim: int = 3) -> L
             result.append(claim)
             continue
         
-        # Split into per-bracket claims
+        # Try to split into per-bracket clauses. If ANY resulting clause is too
+        # short (a coherent phrase like "long short-term memory [13]" being torn
+        # at a comma), abandon the split and keep the whole sentence — per-ref
+        # verification still checks each ref, but against full-context text
+        # instead of a meaningless fragment.
+        pieces = []
+        fragmented = False
         for match in matches:
-            # Extract the clause before this citation bracket
             pos = match.start()
-            # Walk backwards to find clause boundary
             clause_start = max(0, pos - 200)
             for i in range(pos - 1, max(0, pos - 200), -1):
                 if text[i] in ',;.':
                     clause_start = i + 1
                     break
-            
+
             clause = text[clause_start:match.end()].strip()
-            if len(clause) < 20:
-                continue
-            
-            # Parse refs from this bracket
+
             bracket_refs = []
             for num in match.group(1).split(','):
                 num = num.strip()
                 if num.isdigit():
                     bracket_refs.append(int(num))
-            
-            if bracket_refs:
-                result.append({
-                    "claim_text": clause,
-                    "cited_refs": bracket_refs,
-                })
-    
+
+            if len(clause) < 40 or not bracket_refs:
+                fragmented = True
+                break
+            pieces.append({"claim_text": clause, "cited_refs": bracket_refs})
+
+        if pieces and not fragmented:
+            result.extend(pieces)
+        else:
+            result.append(claim)  # keep whole rather than emit fragments
+
     return result

@@ -235,8 +235,20 @@ def _fetch_arxiv(arxiv_id: str) -> Optional[str]:
         import tempfile
         # Download the actual PDF (open access)
         pdf_url = f"https://arxiv.org/pdf/{arxiv_id}"
-        resp = requests.get(pdf_url, timeout=30, headers={"User-Agent": "HallucinationNerd/1.0"})
-        if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("application/pdf"):
+        # Retry with backoff: arXiv rate-limits (429) and occasionally 5xxs;
+        # a single miss should not silently drop the source.
+        resp = None
+        for _attempt in range(3):
+            try:
+                resp = requests.get(pdf_url, timeout=30, headers={"User-Agent": "HallucinationNerd/1.0"})
+            except requests.RequestException:
+                resp = None
+            if resp is not None and resp.status_code == 200:
+                break
+            if resp is not None and resp.status_code not in (429, 500, 502, 503, 504):
+                break
+            _time.sleep(1.5 * (_attempt + 1))
+        if resp is not None and resp.status_code == 200 and resp.headers.get("content-type", "").startswith("application/pdf"):
             # Save to temp file and extract text
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                 tmp.write(resp.content)
