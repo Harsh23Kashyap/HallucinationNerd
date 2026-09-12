@@ -4,26 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>About — HallucinationNerd</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="description" content="About HallucinationNerd: citation-level hallucination verification, how it works, and the team behind it.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-white min-h-screen text-gray-800">
+<body class="about-page">
 
-    <!-- Header / nav -->
-    <header class="border-b border-gray-200">
-        <div class="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
-            <a href="index.html" class="text-xl font-bold text-gray-900">🤓 HallucinationNerd</a>
-            <nav class="text-sm text-gray-600 flex gap-5">
-                <a href="index.html" class="hover:text-gray-900">Home</a>
-                <a href="about.html" class="text-gray-900 font-medium">About</a>
-                <a href="mailto:shasha@cs.nyu.edu" class="hover:text-gray-900">Contact</a>
+    <header class="site-header">
+        <div class="wrap">
+            <a class="brand-mark" href="index.html">
+                <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true">
+                    <rect x="1.5" y="1.5" width="31" height="31" rx="7" fill="#1B1712"/>
+                    <path d="M11 9.5v15M23 9.5v15" stroke="#F5F1E8" stroke-width="2.4" stroke-linecap="round"/>
+                    <path d="M11 9.5h4M11 24.5h4M23 9.5h-4M23 24.5h-4" stroke="#F5F1E8" stroke-width="2.4" stroke-linecap="round"/>
+                    <path d="M13.5 17l2.6 2.6L21 14.8" stroke="#E2603F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span class="brand-word">Hallucination<em>Nerd</em></span>
+            </a>
+            <nav class="site-nav">
+                <a href="index.html">Home</a>
+                <a href="about.html" class="active">About</a>
+                <a href="mailto:shasha@cs.nyu.edu">Contact</a>
             </nav>
         </div>
     </header>
 
-    <main class="max-w-3xl mx-auto px-6 py-10">
+    <main class="about-main">
 
-        <h1 class="text-3xl font-bold text-gray-900 mb-6">About Us</h1>
-        <p class="text-gray-700 leading-relaxed mb-8">
+        <h1>About Us</h1>
+        <p class="lead">
             HallucinationNerd is a large language model-based tool that checks whether the
             sources cited in a piece of text actually support the claims attributed to them.
             Given any document with inline citations — a retrieval-augmented (RAG) answer, an
@@ -33,8 +44,8 @@
             does not support it, or contradicts it. It works on PDFs, web pages, and plain text.
         </p>
 
-        <h2 class="text-2xl font-semibold text-gray-900 mb-4">How It Works</h2>
-        <p class="text-gray-700 leading-relaxed mb-8">
+        <h2>How It Works</h2>
+        <p class="lead">
             HallucinationNerd runs a four-stage pipeline: it extracts atomic claims and their
             citations, retrieves the cited source's content and locates the most relevant passage,
             and then asks a structured LLM judge whether that source supports the claim, returning
@@ -44,57 +55,57 @@
             for recall.
         </p>
 
-        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Meet Our Team</h2>
-        <div class="grid gap-5 sm:grid-cols-2 mb-10">
+        <h2>Meet Our Team</h2>
+        <div class="team-grid">
 
-            <div class="border border-gray-200 rounded-lg p-5 flex gap-4">
-                <img src="img/taranum.jpg" alt="Taranum Wasu" class="shrink-0 w-24 h-24 rounded-full object-cover">
+            <div class="team-card">
+                <img src="img/taranum.jpg" alt="Taranum Wasu" class="avatar">
                 <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Taranum Wasu</h3>
-                    <p class="text-sm text-gray-600 mt-1">Researcher</p>
-                    <p class="text-sm text-gray-500 mt-1">Thapar Institute of Engineering and Technology, Patiala, India</p>
-                    <p class="text-sm mt-2"><a href="https://www.linkedin.com/in/taranum-wasu/" class="text-blue-600 hover:underline">LinkedIn</a></p>
+                    <h3>Taranum Wasu</h3>
+                    <p class="role">Researcher</p>
+                    <p class="aff">Thapar Institute of Engineering and Technology, Patiala, India</p>
+                    <p class="li"><a href="https://www.linkedin.com/in/taranum-wasu/">LinkedIn</a></p>
                 </div>
             </div>
 
-            <div class="border border-gray-200 rounded-lg p-5 flex gap-4">
-                <img src="img/harsh.jpg" alt="Harsh Kashyap" class="shrink-0 w-24 h-24 rounded-full object-cover">
+            <div class="team-card">
+                <img src="img/harsh.jpg" alt="Harsh Kashyap" class="avatar">
                 <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Harsh Kashyap</h3>
-                    <p class="text-sm text-gray-600 mt-1">Researcher</p>
-                    <p class="text-sm text-gray-500 mt-1">Thapar Institute of Engineering and Technology, Patiala, India</p>
-                    <p class="text-sm mt-2"><a href="https://www.linkedin.com/in/harsh-kashyap/" class="text-blue-600 hover:underline">LinkedIn</a></p>
+                    <h3>Harsh Kashyap</h3>
+                    <p class="role">Researcher</p>
+                    <p class="aff">Thapar Institute of Engineering and Technology, Patiala, India</p>
+                    <p class="li"><a href="https://www.linkedin.com/in/harsh-kashyap/">LinkedIn</a></p>
                 </div>
             </div>
 
-            <div class="border border-gray-200 rounded-lg p-5 flex gap-4">
-                <div class="shrink-0 w-24 h-24 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-lg font-semibold">VC</div>
+            <div class="team-card">
+                <div class="avatar-ph">VC</div>
                 <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Vishnu Chennur</h3>
-                    <p class="text-sm text-gray-600 mt-1">Researcher</p>
-                    <p class="text-sm text-gray-500 mt-1">Downingtown STEM Academy, Downingtown, PA, USA</p>
-                    <p class="text-sm mt-2"><a href="https://www.linkedin.com/in/vishnu-chennur-a2a166361/" class="text-blue-600 hover:underline">LinkedIn</a></p>
+                    <h3>Vishnu Chennur</h3>
+                    <p class="role">Researcher</p>
+                    <p class="aff">Downingtown STEM Academy, Downingtown, PA, USA</p>
+                    <p class="li"><a href="https://www.linkedin.com/in/vishnu-chennur-a2a166361/">LinkedIn</a></p>
                 </div>
             </div>
 
-            <div class="border border-gray-200 rounded-lg p-5 flex gap-4">
-                <img src="img/dennis.jpg" alt="Dennis Shasha" class="shrink-0 w-24 h-24 rounded-full object-cover">
+            <div class="team-card">
+                <img src="img/dennis.jpg" alt="Dennis Shasha" class="avatar">
                 <div>
-                    <h3 class="text-lg font-semibold text-gray-900">
-                        <a href="https://cs.nyu.edu/~shasha/" class="hover:underline">Dennis Shasha</a>
-                    </h3>
-                    <p class="text-sm text-gray-600 mt-1">Professor of Computer Science</p>
-                    <p class="text-sm text-gray-500 mt-1">Courant Institute of Mathematical Sciences, New York University, New York, USA</p>
+                    <h3><a href="https://cs.nyu.edu/~shasha/">Dennis Shasha</a></h3>
+                    <p class="role">Professor of Computer Science</p>
+                    <p class="aff">Courant Institute of Mathematical Sciences, New York University, New York, USA</p>
                 </div>
             </div>
 
         </div>
 
-        <a href="index.html"
-           class="inline-block bg-blue-600 text-white font-medium py-3 px-6 rounded-md hover:bg-blue-700 transition-colors">
-            Try HallucinationNerd
-        </a>
+        <a class="try-btn" href="index.html">Try HallucinationNerd <span class="arrow">-&gt;</span></a>
 
     </main>
+
+    <footer class="site-footer">
+        <p>HallucinationNerd · <a href="https://github.com/Taranum01/HallucinationNerd">GitHub</a></p>
+    </footer>
+
 </body>
 </html>

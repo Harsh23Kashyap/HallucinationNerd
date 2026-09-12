@@ -53,6 +53,7 @@ form.addEventListener('submit', async (e) => {
     emptyState.classList.add('hidden');
     errorState.classList.add('hidden');
     summaryBar.classList.add('hidden');
+    const _df = document.getElementById('doneFlag'); if (_df) _df.classList.add('hidden');
     claimsList.innerHTML = '';
     document.getElementById('detailsHeader').style.display = 'none';
     document.getElementById('categoryReport').querySelectorAll('[id^="cat"]').forEach(el => el.classList.add('hidden'));
@@ -62,16 +63,12 @@ form.addEventListener('submit', async (e) => {
     // Animated progress messages
     const loadingMsg = document.getElementById('loadingMsg');
     const stages = [
-        'Extracting text from document...',
-        'Identifying claims with citations...',
-        'Resolving cited references...',
-        'Downloading source papers from arXiv...',
-        'Verifying claims against sources...',
-        'Checking claim 1...',
-        'Checking claim 2...',
-        'Checking claim 3...',
-        'Still verifying (this can take 1-2 minutes for large papers)...',
-        'Almost done...',
+        'Extracting text from the document...',
+        'Identifying claims and their citations...',
+        'Resolving the cited references...',
+        'Retrieving the cited source documents...',
+        'Checking each claim against its cited source...',
+        'Still working — larger papers can take 1–2 minutes...',
     ];
     let stageIdx = 0;
     const progressInterval = setInterval(() => {
@@ -120,6 +117,8 @@ function renderResults(data) {
     const s = data.summary;
 
     emptyState.classList.add('hidden');
+    const doneFlag = document.getElementById('doneFlag');
+    if (doneFlag) doneFlag.classList.remove('hidden');
 
     // Summary
     summaryBar.classList.remove('hidden');
@@ -168,7 +167,7 @@ function renderResults(data) {
         const refs = c.cited_refs || [];
         if (refs.length === 0) {
             // Uncited claim: bucket by backup-search outcome
-            if (c.verdict === 'BACKUP_FOUND') backupFoundCount++;
+            if (c.verdict === 'BACKUP_FOUND' || c.verdict === 'BACKUP_PARTIAL') backupFoundCount++;
             else if (c.verdict === 'NO_BACKUP_FOUND') noBackupCount++;
             else noCitationCount++;
             return;
@@ -234,6 +233,8 @@ function renderResults(data) {
         let verdictBadge;
         if (claim.verdict === 'BACKUP_FOUND') {
             verdictBadge = { label: `✓ Backup Source Found${claim.backup_source ? ' — ' + claim.backup_source : ''}`, class: 'badge-backup-found' };
+        } else if (claim.verdict === 'BACKUP_PARTIAL') {
+            verdictBadge = { label: `◐ Backup Source — Partial Support${claim.backup_source ? ' — ' + claim.backup_source : ''}`, class: 'badge-partial' };
         } else if (claim.verdict === 'NO_BACKUP_FOUND') {
             verdictBadge = { label: '✗ No Backup Source', class: 'badge-no-backup' };
         } else if (noRefs) {
@@ -278,6 +279,7 @@ function getVerdictClass(verdict) {
         case 'NOT_SUPPORTED': return 'verdict-not-supported';
         case 'CONTRADICTED': return 'verdict-contradicted';
         case 'BACKUP_FOUND': return 'verdict-backup-found';
+        case 'BACKUP_PARTIAL': return 'verdict-partial';
         case 'NO_BACKUP_FOUND': return 'verdict-no-backup';
         default: return 'verdict-unverifiable';
     }
