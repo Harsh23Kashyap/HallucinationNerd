@@ -13,6 +13,50 @@ import re
 from typing import List
 
 
+def _strip_leading_heading(text: str) -> str:
+    """Remove a leading section number like '3 ' or '3.1 ' that PDF extraction
+    sometimes glues onto the start of a claim (e.g. '3 Model Architecture ...')."""
+    return re.sub(r'^\s*\d+(?:\.\d+)*\s+', '', text).strip()
+
+
+def extract_uncited_claims_from_text(text: str, max_claims: int = 25) -> List[dict]:
+    """Extract substantive sentences that carry NO citation marker.
+
+    The main extractor is citation-only, so uncited claims never enter the
+    pipeline — which means the advertised "backup search for uncited claims"
+    feature silently drops them. When the user enables backup databases, we call
+    this so those claims are actually checked. Filtered + capped to avoid
+    flooding results with every sentence of a long document.
+    """
+    ref_start = _find_references_start(text)
+    body = text[:ref_start] if ref_start else text
+
+    sentence_splitter = re.compile(r'(?<=[.!?])\s+(?=[A-Z])')
+    sentences = sentence_splitter.split(body)
+
+    claims = []
+    seen = set()
+    for sent in sentences:
+        clean = re.sub(r'\s+', ' ', sent).strip()
+        clean = _strip_leading_heading(clean)
+        if not (40 <= len(clean) <= 400):
+            continue
+        if re.search(r'\[\d', clean):          # has a citation -> not uncited
+            continue
+        if not re.search(r'[a-z]', clean):      # skip ALL-CAPS headings
+            continue
+        if not clean.rstrip().endswith(('.', '!', '?')):  # skip fragments/headings
+            continue
+        key = clean[:100]
+        if key in seen:
+            continue
+        seen.add(key)
+        claims.append({"claim_text": clean, "cited_refs": []})
+        if len(claims) >= max_claims:
+            break
+    return claims
+
+
 def extract_cited_claims_from_text(text: str, max_claims: int = 200) -> List[dict]:
     """
     Extract sentences/clauses containing citation markers [N] from document text.
@@ -90,6 +134,7 @@ def extract_cited_claims_from_text(text: str, max_claims: int = 200) -> List[dic
 
         # Clean the sentence (remove line breaks from PDF extraction)
         clean = re.sub(r'\s+', ' ', sent).strip()
+        clean = _strip_leading_heading(clean)
         # Remove very long sentences (likely parsing errors)
         if len(clean) > 500:
             # Try to extract just the clause around the citation

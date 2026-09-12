@@ -267,9 +267,18 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
 
     # Step 2: Extract claims with citations using deterministic regex extraction
     # (more reliable than LLM-based decompose_claims for preserving citation markers)
-    from pdf_claim_extractor import extract_cited_claims_from_text, split_multi_ref_claims
+    from pdf_claim_extractor import extract_cited_claims_from_text, split_multi_ref_claims, extract_uncited_claims_from_text
 
     claims = extract_cited_claims_from_text(text)
+
+    # If the user enabled backup databases, also pull in uncited claims so they
+    # are actually checked against those databases (otherwise the citation-only
+    # extractor silently drops every uncited claim).
+    if (databases or custom_database):
+        _cited_keys = {c["claim_text"][:100] for c in claims}
+        for uc in extract_uncited_claims_from_text(text):
+            if uc["claim_text"][:100] not in _cited_keys:
+                claims.append(uc)
 
     # If regex extraction found nothing, fall back to LLM-based decomposition
     if not claims:
