@@ -9,6 +9,7 @@ import json
 import asyncio
 import tempfile
 import hashlib
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -431,6 +432,17 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
         else:
             reasoning = verification.reasoning
 
+        # Wrong-source guard: if content WAS resolved but is topically unrelated
+        # to the claim, do not assert a confident NOT_SUPPORTED/CONTRADICTED off a
+        # mis-fetched source — mark it inaccessible instead.
+        if articles and verdict_out in ("NOT_SUPPORTED", "CONTRADICTED") and _looks_off_topic(claim_text, articles):
+            reflist = ", ".join(str(r) for r in cited_refs)
+            reasoning = (
+                f"A citation is present ([{reflist}]), but the source retrieved for it did not "
+                f"appear to match the citation, so the claim could not be reliably verified against it."
+            )
+            verdict_out = "INACCESSIBLE"
+
         results.append({
             "claim": claim_text,
             "cited_refs": cited_refs,
@@ -484,6 +496,23 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
         },
         "claims": results,
     }
+
+
+def _looks_off_topic(claim_text: str, articles: list, min_overlap: float = 0.15) -> bool:
+    """True if the resolved source content is topically unrelated to the claim.
+
+    Guards against a mis-fetched source (e.g. a citation that resolved to an
+    unrelated paper) producing a confident NOT_SUPPORTED. Genuine
+    not-supported cases share the claim's topic (high overlap); a wrong-source
+    match shares almost none.
+    """
+    def toks(x):
+        return {w for w in re.sub(r"[^\w\s]", " ", (x or "").lower()).split() if len(w) > 4}
+    q = toks(claim_text)
+    if not q:
+        return False
+    body = toks(" ".join(a.get("content", "") for a in articles))
+    return (len(q & body) / len(q)) < min_overlap
 
 
 def _verify_structured_input(data: list) -> dict:
