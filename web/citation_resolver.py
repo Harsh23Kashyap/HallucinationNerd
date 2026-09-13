@@ -215,7 +215,8 @@ _AY_CHARS = r"A-Za-z\u00c0-\u017f\u00a8\u00b4'\u2019\-"
 _AY_ENTRY_START = re.compile(
     r"(?:^|\n)\s*(?:"
     r"[A-Z][" + _AY_CHARS + r"]{1,30},\s+[A-Z][a-z]?\.?"   # Surname, F.
-    r"|[A-Z][a-z]{1,30}\s+(?:[A-Z]\.\s+)?[A-Z][" + _AY_CHARS + r"]{1,30},\s"  # First Last,
+    r"|[A-Z][a-z]{1,30}\s+(?:[A-Z]\.?\s+)?[A-Z][" + _AY_CHARS + r"]{1,30}(?:,\s|\s+and\s+)"  # First Last(, / and)
+    r"|(?:[A-Z]\.-?)+\s+[A-Z][" + _AY_CHARS + r"]{1,30},\s"  # J. Deng,
     r")"
 )
 _AY_YEAR = re.compile(r"(?<![\d.])(?:19|20)\d{2}[a-z]?(?![\d])")
@@ -231,8 +232,14 @@ def _first_author_surname(entry_text: str) -> str:
     m = re.match(r"([A-Z][" + _AY_CHARS + r"]{1,30}),\s+[A-Z][a-z]?\.?", head)
     if m:  # surname-first
         return m.group(1)
-    m = re.match(r"[A-Z][a-z]{1,30}\s+(?:[A-Z]\.\s+)?([A-Z][" + _AY_CHARS + r"]{1,30}),", head)
+    m = re.match(r"[A-Z][a-z]{1,30}\s+(?:[A-Z]\.?\s+)?([A-Z][" + _AY_CHARS + r"]{1,30}),", head)
     if m:  # firstname-first
+        return m.group(1)
+    m = re.match(r"(?:[A-Z]\.-?)+\s+([A-Z][" + _AY_CHARS + r"]{1,30}),", head)
+    if m:  # initial-first: "J. Deng,"
+        return m.group(1)
+    m = re.match(r"[A-Z][a-z]{1,30}\s+(?:[A-Z]\.\s+)?([A-Z][" + _AY_CHARS + r"]{1,30})\s+and\s+", head)
+    if m:  # firstname-first, two-author "Jeremy Howard and Sebastian Ruder."
         return m.group(1)
     return ""
 
@@ -261,9 +268,11 @@ _AY_INITIALS = r"(?:[A-Z]\u2019?\.-?\s?)*[A-Z]\u2019?\."   # must END with a per
 _AY_PARTICLE = r"(?:\s+[a-z]{1,3}\.)?"                        # "Freitas, N. d."
 _AY_FF_FIRST = r"[A-Z][" + _AY_CHARS + r"]{1,30}"               # "Minh-Thang" ok
 _AY_SF_PROBE = re.compile(r"^\s*" + _AY_SURNAME + r",\s+" + _AY_INITIALS)
-_AY_FF_PROBE = re.compile(r"^\s*" + _AY_FF_FIRST + r"\s+(?:[A-Z]\.\s+)?" + _AY_SURNAME + r"[,\.\s]")
+_AY_FF_PROBE = re.compile(r"^\s*" + _AY_FF_FIRST + r"\s+(?:[A-Z]\.?\s+)?" + _AY_SURNAME + r"[,\.\s]|^\s*" + _AY_FF_FIRST + r"\s+" + _AY_SURNAME + r"\s+and\s+")
 _AY_SF_UNIT = re.compile(r"^\s*" + _AY_SURNAME + r",\s+" + _AY_INITIALS + _AY_PARTICLE + r",?\s*")
-_AY_FF_UNIT = re.compile(r"^\s*" + _AY_FF_FIRST + r"\s+(?:[A-Z]\.\s+)?" + _AY_SURNAME + r"[.,]?\s*")
+_AY_FF_UNIT = re.compile(r"^\s*" + _AY_FF_FIRST + r"\s+(?:[A-Z]\.?\s+)?" + _AY_SURNAME + r"[.,]?\s*")
+_AY_IF_PROBE = re.compile(r"^\s*(?:[A-Z]\.-?)+\s+" + _AY_SURNAME)
+_AY_IF_UNIT = re.compile(r"^\s*(?:[A-Z]\.-?)+\s+" + _AY_SURNAME + r"[.,]?\s*")
 _AY_CONNECTOR = re.compile(r"^\s*(?:and|&)\s+")
 _AY_ETAL = re.compile(r"^,?\s*et\s+al\.?\s*", re.IGNORECASE)
 
@@ -272,6 +281,8 @@ def _ay_strip_authors(text: str) -> str:
     """Remove the leading author list; stop at the first non-author text."""
     if _AY_SF_PROBE.match(text):
         unit = _AY_SF_UNIT
+    elif _AY_IF_PROBE.match(text):
+        unit = _AY_IF_UNIT
     elif _AY_FF_PROBE.match(text):
         unit = _AY_FF_UNIT
     else:
@@ -614,14 +625,24 @@ def _title_matches(query: str, title: str, min_overlap: float = 0.5) -> bool:
 
 def _search_arxiv_by_title(query: str) -> Optional[str]:
     """Search arXiv API by title and download the full PDF if the hit actually
-    matches the reference title. No rate limit."""
+    matches the reference title. Rate-limited like every other external call;
+    the API 429s/times out under parallel load otherwise."""
     try:
         import urllib.parse
-        # arXiv API search
+        # arXiv API search (https avoids the http->https redirect round-trip)
         clean_query = re.sub(r'[^\w\s]', ' ', query).strip()
-        search_url = f"http://export.arxiv.org/api/query?search_query=ti:{urllib.parse.quote(clean_query[:100])}&max_results=1"
-        resp = requests.get(search_url, timeout=15)
-        if resp.status_code != 200:
+        search_url = f"https://export.arxiv.org/api/query?search_query=ti:{urllib.parse.quote(clean_query[:100])}&max_results=1"
+        resp = None
+        for _attempt in range(2):
+            _rate_limit()
+            try:
+                resp = requests.get(search_url, timeout=20)
+            except requests.RequestException:
+                resp = None
+            if resp is not None and resp.status_code == 200:
+                break
+            _time.sleep(0.6 * (_attempt + 1))
+        if resp is None or resp.status_code != 200:
             return None
 
         # Parse the Atom XML response
