@@ -602,9 +602,36 @@ def _search_and_fetch(query: str) -> Optional[str]:
         if not ids:
             return None
 
+        # Relevance guard, same standard as the arXiv path: PubMed's top hit
+        # for a non-biomedical reference is usually an unrelated paper, and
+        # without a title check an arXiv outage silently "resolves" refs to
+        # wrong papers (observed: an ELMo citation resolved to a 2026
+        # Transformer-GNN news-transcription article).
+        cand_title = _pubmed_title(ids[0])
+        if cand_title and not _title_matches(query, cand_title):
+            return None
+
         return _fetch_pubmed_abstract(ids[0])
     except Exception:
         return None
+
+
+def _pubmed_title(pmid: str) -> str:
+    """Fetch a PubMed article's title via esummary, for the relevance guard.
+
+    Returns "" when the lookup fails; callers fail open in that case so a
+    transient esummary hiccup does not cost a legitimately matched abstract.
+    """
+    _rate_limit()
+    try:
+        url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+        resp = requests.get(url, params={"db": "pubmed", "id": pmid, "retmode": "json"}, timeout=10)
+        if resp.status_code == 200:
+            doc = resp.json().get("result", {}).get(str(pmid), {}) or {}
+            return doc.get("title", "") or ""
+    except Exception:
+        pass
+    return ""
 
 
 def _title_matches(query: str, title: str, min_overlap: float = 0.5) -> bool:
@@ -706,7 +733,13 @@ def _search_semantic_scholar(query: str) -> Optional[str]:
         paper = papers[0]
         title = paper.get("title", "")
         abstract = paper.get("abstract", "")
-        
+
+        # Relevance guard, same standard as the arXiv path: reject a top hit
+        # whose title does not match the reference. Without this, S2's fuzzy
+        # search silently "resolves" refs to unrelated papers.
+        if title and not _title_matches(query, title):
+            return None
+
         # If paper has an arXiv ID, fetch the full PDF instead of just abstract
         external_ids = paper.get("externalIds", {}) or {}
         arxiv_id = external_ids.get("ArXiv", "")
