@@ -293,7 +293,7 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
     claims = split_multi_ref_claims(claims)
 
     # Step 2.5: Resolve citations to actual source content
-    from citation_resolver import resolve_and_fetch_all
+    from citation_resolver import resolve_and_fetch_all, resolve_references
 
     # Collect all unique cited refs across all claims
     all_cited = set()
@@ -304,8 +304,17 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
     # Resolve all citations at once (fetches from arXiv, DOI, PubMed, URLs)
     # Use FULL text here (not trimmed) since References section is at the end
     resolved_sources = {}
+    parsed_ref_keys = set()
     if all_cited:
         resolved_sources = resolve_and_fetch_all(text, list(all_cited))
+        # Parsed bibliography keys: lets us distinguish a citation that doesn't
+        # resolve to any bibliography entry ("cited article doesn't exist") from
+        # one that is in the bibliography but whose content couldn't be fetched
+        # ("could not access").
+        try:
+            parsed_ref_keys = {str(k) for k in resolve_references(text).keys()}
+        except Exception:
+            parsed_ref_keys = set()
 
     # Step 3: Verify each claim using per-ref verification (C1 fix)
     # The old code picked the first accessible ref and verified the whole
@@ -435,20 +444,32 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
         verdict_out = verification.verdict
         if not articles and unresolved_refs:
             unresolved_list = ", ".join(str(r) for r in unresolved_refs)
-            note = (
-                f"A citation is present ([{unresolved_list}]), but the cited source(s) could not be "
-                f"accessed (they may be behind a paywall, unavailable, or could not be resolved), "
-                f"so the claim could not be verified against them."
-            )
-            # A citation IS present, so this is NOT "no backup source" — it is an
-            # inaccessible source. Label it clearly. Only surface a backup result
-            # when the user actually enabled backup databases AND one supported it.
+            # Which unresolved refs were actually present in the bibliography?
+            in_bib = [r for r in unresolved_refs if str(r) in parsed_ref_keys]
             if use_backup and verification.verdict in ("BACKUP_FOUND", "BACKUP_PARTIAL"):
                 verdict_out = verification.verdict
+                note = (
+                    f"A citation is present ([{unresolved_list}]), but the cited source(s) "
+                    f"could not be accessed, so the claim could not be verified against them."
+                )
                 reasoning = f"{note}\n" + _remap_refs_in_text(verification.reasoning)
-            else:
+            elif in_bib:
+                # The reference exists in the bibliography but its content could
+                # not be retrieved (paywall / fetch failed) -> "Could not access".
                 verdict_out = "INACCESSIBLE"
-                reasoning = note
+                reasoning = (
+                    f"A citation is present ([{unresolved_list}]) and the reference exists in the "
+                    f"bibliography, but its content could not be accessed (it may be behind a paywall "
+                    f"or otherwise unavailable), so the claim could not be verified against it."
+                )
+            else:
+                # No matching bibliography entry -> "Cited article doesn't exist".
+                verdict_out = "CITATION_NOT_FOUND"
+                reasoning = (
+                    f"The citation(s) [{unresolved_list}] do not resolve to any entry in the "
+                    f"document's bibliography, so the cited article does not appear to exist or "
+                    f"could not be identified."
+                )
         else:
             reasoning = _remap_refs_in_text(verification.reasoning)
 
@@ -473,12 +494,13 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
     contradicted = sum(1 for r in results if r["verdict"] == "CONTRADICTED")
     unverifiable = sum(1 for r in results if r["verdict"] == "UNVERIFIABLE")
     inaccessible = sum(1 for r in results if r["verdict"] == "INACCESSIBLE")
+    citation_not_found = sum(1 for r in results if r["verdict"] == "CITATION_NOT_FOUND")
     backup_found = sum(1 for r in results if r["verdict"] == "BACKUP_FOUND")
     no_backup_found = sum(1 for r in results if r["verdict"] == "NO_BACKUP_FOUND")
 
     # A claim whose cited source could not be accessed is not "verifiable" — it has
     # no accessible source to check against — so exclude it from the denominator.
-    verifiable = total - unverifiable - inaccessible
+    verifiable = total - unverifiable - inaccessible - citation_not_found
     reliability_pct = (supported + partial + backup_found) / verifiable * 100 if verifiable > 0 else 0
     # H5 fix: also expose the supported-only precision. PARTIALLY is
     # ambiguous (the claim is only partially supported by the cited source),
@@ -496,6 +518,7 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
             "contradicted": contradicted,
             "unverifiable": unverifiable,
             "inaccessible": inaccessible,
+            "citation_not_found": citation_not_found,
             "backup_found": backup_found,
             "no_backup_found": no_backup_found,
             "reliability_percent": round(reliability_pct, 1),  # includes PARTIALLY

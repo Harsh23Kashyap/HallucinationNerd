@@ -127,98 +127,13 @@ function renderResults(data) {
     document.getElementById('summaryCount').textContent = s.total_claims;
     document.getElementById('summaryFile').textContent = data.filename;
 
-    const pct = s.reliability_percent;
-    const tone = pct >= 80 ? 'tone-good' : pct >= 50 ? 'tone-mid' : 'tone-bad';
-    const pctEl = document.getElementById('reliabilityPct');
-    pctEl.className = `reliability-num ${tone}`;
-    pctEl.innerHTML = `${pct}%<small>reliable</small>`;
-
-    const bar = document.getElementById('reliabilityBar');
-    bar.style.width = `${pct}%`;
-    bar.className = `meter-fill ${tone}`;
-
-    // Verdict counts -> stat grid (real numbers, no blank bars)
-    let nSupported = 0, nPartial = 0, nNotSupported = 0, nUncited = 0;
-    data.claims.forEach(c => {
-        const noRefs = (!c.cited_refs || c.cited_refs.length === 0);
-        if (noRefs) { nUncited++; return; }
-        if (c.verdict === 'SUPPORTED') nSupported++;
-        else if (c.verdict === 'PARTIALLY_SUPPORTED') nPartial++;
-        else if (c.verdict === 'NOT_SUPPORTED' || c.verdict === 'CONTRADICTED') nNotSupported++;
-    });
-    document.getElementById('statTotal').textContent = data.claims.length;
-    document.getElementById('statSupported').textContent = nSupported;
-    document.getElementById('statPartial').textContent = nPartial;
-    document.getElementById('statNotSupported').textContent = nNotSupported;
-    document.getElementById('statUncited').textContent = nUncited;
-
-    // Build categorized report (professor's format)
-    const existingRefs = new Set();
-    const nonExistentRefs = new Set();
-    const supportedRefs = new Set();
-    const partialRefs = new Set();
-    const notSupportedRefs = new Set();
-    const inaccessibleRefs = new Set();
-    let noCitationCount = 0;
-    let backupFoundCount = 0;
-    let noBackupCount = 0;
-
-    data.claims.forEach(c => {
-        const refs = c.cited_refs || [];
-        if (refs.length === 0) {
-            // Uncited claim: bucket by backup-search outcome
-            if (c.verdict === 'BACKUP_FOUND' || c.verdict === 'BACKUP_PARTIAL') backupFoundCount++;
-            else if (c.verdict === 'NO_BACKUP_FOUND') noBackupCount++;
-            else noCitationCount++;
-            return;
-        }
-        refs.forEach(r => {
-            if (c.citation_exists === true) {
-                existingRefs.add(r);
-            } else if (c.citation_exists === false || c.citation_exists === null || c.citation_exists === undefined) {
-                inaccessibleRefs.add(r);
-            }
-        });
-
-        if (c.verdict === 'SUPPORTED') {
-            refs.forEach(r => supportedRefs.add(r));
-        } else if (c.verdict === 'PARTIALLY_SUPPORTED') {
-            refs.forEach(r => partialRefs.add(r));
-        } else if (c.verdict === 'NOT_SUPPORTED' || c.verdict === 'CONTRADICTED') {
-            refs.forEach(r => notSupportedRefs.add(r));
-        }
-    });
-
-    // Show each category if it has entries
-    function showCat(id, refsSet) {
-        if (refsSet.size > 0) {
-            const el = document.getElementById(id);
-            el.classList.remove('hidden');
-            const sorted = [...refsSet].sort((a, b) => a - b);
-            document.getElementById(id + 'Refs').textContent = sorted.map(r => `[${r}]`).join(', ');
-        }
-    }
-    showCat('catExisting', existingRefs);
-    showCat('catNonExistent', nonExistentRefs);
-    showCat('catSupported', supportedRefs);
-    showCat('catPartial', partialRefs);
-    showCat('catNotSupported', notSupportedRefs);
-    showCat('catInaccessible', inaccessibleRefs);
-    if (noCitationCount > 0) {
-        document.getElementById('catNoCitation').classList.remove('hidden');
-        document.getElementById('catNoCitationRefs').textContent =
-            `${noCitationCount} claim${noCitationCount === 1 ? '' : 's'} with no inline citation`;
-    }
-    if (backupFoundCount > 0) {
-        document.getElementById('catBackupFound').classList.remove('hidden');
-        document.getElementById('catBackupFoundRefs').textContent =
-            `${backupFoundCount} uncited claim${backupFoundCount === 1 ? '' : 's'} matched to a supporting source`;
-    }
-    if (noBackupCount > 0) {
-        document.getElementById('catNoBackup').classList.remove('hidden');
-        document.getElementById('catNoBackupRefs').textContent =
-            `${noBackupCount} uncited claim${noBackupCount === 1 ? '' : 's'} with no supporting source found`;
-    }
+    // Numerical summary — the paper's six verdict categories, with counts.
+    document.getElementById('vcSupported').textContent = s.supported || 0;
+    document.getElementById('vcPartial').textContent = s.partially_supported || 0;
+    document.getElementById('vcNotSupported').textContent = s.not_supported || 0;
+    document.getElementById('vcContradicted').textContent = s.contradicted || 0;
+    document.getElementById('vcNotFound').textContent = s.citation_not_found || 0;
+    document.getElementById('vcNoAccess').textContent = (s.inaccessible || 0) + (s.unverifiable || 0);
 
     // Show detailed claims header
     document.getElementById('detailsHeader').style.display = 'block';
@@ -232,15 +147,17 @@ function renderResults(data) {
         const noRefs = (!claim.cited_refs || claim.cited_refs.length === 0);
         let verdictBadge;
         if (claim.verdict === 'BACKUP_FOUND') {
-            verdictBadge = { label: `✓ Backup Source Found${claim.backup_source ? ' — ' + claim.backup_source : ''}`, class: 'badge-backup-found' };
+            verdictBadge = { label: `Backup source found${claim.backup_source ? ' — ' + claim.backup_source : ''}`, class: 'badge-backup-found' };
         } else if (claim.verdict === 'BACKUP_PARTIAL') {
-            verdictBadge = { label: `◐ Backup Source — Partial Support${claim.backup_source ? ' — ' + claim.backup_source : ''}`, class: 'badge-partial' };
+            verdictBadge = { label: `Backup source — partial${claim.backup_source ? ' — ' + claim.backup_source : ''}`, class: 'badge-hn-partial' };
         } else if (claim.verdict === 'NO_BACKUP_FOUND') {
-            verdictBadge = { label: '✗ No Backup Source', class: 'badge-no-backup' };
-        } else if (claim.verdict === 'INACCESSIBLE') {
-            verdictBadge = { label: '⚠ Source Could Not Be Accessed', class: 'badge-unverifiable' };
+            verdictBadge = { label: 'No backup source', class: 'badge-no-backup' };
+        } else if (claim.verdict === 'CITATION_NOT_FOUND') {
+            verdictBadge = { label: "Cited article doesn't exist", class: 'badge-hn-noexist' };
+        } else if (claim.verdict === 'INACCESSIBLE' || claim.verdict === 'UNVERIFIABLE') {
+            verdictBadge = { label: 'Could not access', class: 'badge-hn-noaccess' };
         } else if (noRefs) {
-            verdictBadge = { label: '— No Citation Provided', class: 'badge-no-citation' };
+            verdictBadge = { label: 'No citation provided', class: 'badge-no-citation' };
         } else {
             verdictBadge = getVerdictBadge(claim.verdict);
         }
@@ -280,21 +197,23 @@ function getVerdictClass(verdict) {
         case 'PARTIALLY_SUPPORTED': return 'verdict-partial';
         case 'NOT_SUPPORTED': return 'verdict-not-supported';
         case 'CONTRADICTED': return 'verdict-contradicted';
+        case 'CITATION_NOT_FOUND': return 'verdict-not-found';
         case 'BACKUP_FOUND': return 'verdict-backup-found';
         case 'BACKUP_PARTIAL': return 'verdict-partial';
         case 'NO_BACKUP_FOUND': return 'verdict-no-backup';
-        case 'INACCESSIBLE': return 'verdict-unverifiable';
-        default: return 'verdict-unverifiable';
+        case 'INACCESSIBLE': return 'verdict-noaccess';
+        case 'UNVERIFIABLE': return 'verdict-noaccess';
+        default: return 'verdict-noaccess';
     }
 }
 
 function getVerdictBadge(verdict) {
     switch (verdict) {
-        case 'SUPPORTED': return { label: '✓ Verified', class: 'badge-supported' };
-        case 'PARTIALLY_SUPPORTED': return { label: '◐ Partially Verified', class: 'badge-partial' };
-        case 'NOT_SUPPORTED': return { label: '✗ Not Supported', class: 'badge-not-supported' };
-        case 'CONTRADICTED': return { label: '⚠ Contradicted', class: 'badge-contradicted' };
-        default: return { label: '? Could Not Verify', class: 'badge-unverifiable' };
+        case 'SUPPORTED': return { label: 'Supported', class: 'badge-hn-supported' };
+        case 'PARTIALLY_SUPPORTED': return { label: 'Partially supported', class: 'badge-hn-partial' };
+        case 'NOT_SUPPORTED': return { label: 'Not supported', class: 'badge-hn-notsupp' };
+        case 'CONTRADICTED': return { label: 'Contradicted', class: 'badge-hn-contra' };
+        default: return { label: 'Could not access', class: 'badge-hn-noaccess' };
     }
 }
 

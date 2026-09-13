@@ -123,68 +123,26 @@
                 <div class="summary-card">
                     <div class="summary-top">
                         <span class="summary-source"><b id="summaryCount"></b> claims analyzed from <span class="fname" id="summaryFile"></span></span>
-                        <span class="reliability-num" id="reliabilityPct"><small>reliable</small></span>
                         <span id="summaryText" class="hidden"></span>
                     </div>
-                    <div class="meter"><div id="reliabilityBar" class="meter-fill"></div></div>
-                    <p class="reliability-caption">Reliability score — the share of verifiable claims (those with an accessible cited source) whose source actually supports the claim.</p>
-                    <div class="stat-grid">
-                        <div class="stat stat-total"><span class="n" id="statTotal">0</span><span class="l">Claims</span></div>
-                        <div class="stat stat-ok"><span class="n" id="statSupported">0</span><span class="l">Supported</span></div>
-                        <div class="stat stat-warn"><span class="n" id="statPartial">0</span><span class="l">Partial</span></div>
-                        <div class="stat stat-bad"><span class="n" id="statNotSupported">0</span><span class="l">Not supported</span></div>
-                        <div class="stat stat-uncited"><span class="n" id="statUncited">0</span><span class="l">Uncited</span></div>
+                    <div class="verdict-summary" id="verdictSummary">
+                        <div class="vrow"><span class="sw" style="background:#1B7F3B"></span><span class="vlabel">Supported</span><span class="vcount" id="vcSupported">0</span></div>
+                        <div class="vrow"><span class="sw" style="background:#A6E0B3"></span><span class="vlabel">Partially supported</span><span class="vcount" id="vcPartial">0</span></div>
+                        <div class="vrow"><span class="sw" style="background:#F2D64B"></span><span class="vlabel">Not supported</span><span class="vcount" id="vcNotSupported">0</span></div>
+                        <div class="vrow"><span class="sw" style="background:#E0392B"></span><span class="vlabel">Contradicted</span><span class="vcount" id="vcContradicted">0</span></div>
+                        <div class="vrow"><span class="sw" style="background:#000000"></span><span class="vlabel">Cited article doesn&#39;t exist</span><span class="vcount" id="vcNotFound">0</span></div>
+                        <div class="vrow"><span class="sw" style="background:#595959"></span><span class="vlabel">Could not access</span><span class="vcount" id="vcNoAccess">0</span></div>
                     </div>
-                    <div class="cat-report" id="categoryReport">
-                        <div id="catExisting" class="cat-row c-blue hidden">
-                            <span class="cat-name">Citations Identify Existing Articles:</span>
-                            <span class="cat-vals" id="catExistingRefs"></span>
-                        </div>
-                        <div id="catNonExistent" class="cat-row c-orange hidden">
-                            <span class="cat-name">Citations Identify Non-Existent Articles:</span>
-                            <span class="cat-vals" id="catNonExistentRefs"></span>
-                        </div>
-                        <div id="catSupported" class="cat-row c-green hidden">
-                            <span class="cat-name">Claim Fully Supported in Articles:</span>
-                            <span class="cat-vals" id="catSupportedRefs"></span>
-                        </div>
-                        <div id="catPartial" class="cat-row c-yellow hidden">
-                            <span class="cat-name">Claim Partly Supported in Articles:</span>
-                            <span class="cat-vals" id="catPartialRefs"></span>
-                        </div>
-                        <div id="catNotSupported" class="cat-row c-red hidden">
-                            <span class="cat-name">Claim Not Supported in Articles:</span>
-                            <span class="cat-vals" id="catNotSupportedRefs"></span>
-                        </div>
-                        <div id="catNoCitation" class="cat-row c-purple hidden">
-                            <span class="cat-name">No Citation Provided:</span>
-                            <span class="cat-vals" id="catNoCitationRefs"></span>
-                        </div>
-                        <div id="catBackupFound" class="cat-row c-teal hidden">
-                            <span class="cat-name">Uncited Claim — Supporting Source Found:</span>
-                            <span class="cat-vals" id="catBackupFoundRefs"></span>
-                        </div>
-                        <div id="catNoBackup" class="cat-row c-orange hidden">
-                            <span class="cat-name">Uncited Claim — No Supporting Source Found:</span>
-                            <span class="cat-vals" id="catNoBackupRefs"></span>
-                        </div>
-                        <div id="catInaccessible" class="cat-row c-gray hidden">
-                            <span class="cat-name">Inaccessible Articles:</span>
-                            <span class="cat-vals" id="catInaccessibleRefs"></span>
-                        </div>
-                    </div>
+
                     <details class="legend-box">
                         <summary>What do these result codes mean?</summary>
                         <ul>
-                            <li><b>Claim Fully Supported</b> — the cited source clearly states the claim.</li>
-                            <li><b>Claim Partly Supported</b> — the source backs the gist, but the claim adds specifics the source doesn't fully support.</li>
-                            <li><b>Claim Not Supported</b> — the cited source does not contain the claim.</li>
-                            <li><b>Contradicted</b> — the cited source states the opposite of the claim.</li>
-                            <li><b>Citations Identify Existing / Non-Existent Articles</b> — whether each cited reference could be located at all.</li>
-                            <li><b>Inaccessible Articles</b> — a citation is present, but the source could not be retrieved (paywall, dead link, or unreadable), so the claim could not be checked.</li>
-                            <li><b>No Citation Provided</b> — the claim carries no inline citation.</li>
-                            <li><b>Uncited Claim — Supporting Source Found / Partial</b> — an uncited claim was matched to a supporting source via backup search.</li>
-                            <li><b>Uncited Claim — No Supporting Source Found</b> — backup search found no source for an uncited claim.</li>
+                            <li><span class="lsw" style="background:#1B7F3B"></span><b>Supported</b> — the cited source states or logically implies the claim.</li>
+                            <li><span class="lsw" style="background:#A6E0B3"></span><b>Partially supported</b> — same topic and right direction, but the claim adds specifics not in the source.</li>
+                            <li><span class="lsw" style="background:#F2D64B"></span><b>Not supported</b> — the source contains nothing relevant to the claim.</li>
+                            <li><span class="lsw" style="background:#E0392B"></span><b>Contradicted</b> — the source states the opposite of the claim.</li>
+                            <li><span class="lsw" style="background:#000000"></span><b>Cited article doesn&#39;t exist</b> — the citation does not resolve to a real, retrievable document.</li>
+                            <li><span class="lsw" style="background:#595959"></span><b>Could not access</b> — the article exists but its content could not be retrieved or is too sparse to assess.</li>
                         </ul>
                     </details>
 

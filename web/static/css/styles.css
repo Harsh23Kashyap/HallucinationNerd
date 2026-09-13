@@ -768,3 +768,34 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); box-shado
 .site-footer a { color: var(--ink-soft); text-decoration: underline; text-underline-offset: 2px; }
 .site-footer a:hover { color: var(--accent); }
 @media (max-width: 720px) { .team-grid { grid-template-columns: 1fr; } .about-main h1 { font-size: 28px; } }
+
+
+/* ===== Paper's canonical 6-category palette (design_implementation.tex) ===== */
+:root {
+  --hn-supported: #1B7F3B;
+  --hn-partial:   #A6E0B3;
+  --hn-notsupp:   #F2D64B;
+  --hn-contra:    #E0392B;
+  --hn-noexist:   #000000;
+  --hn-noaccess:  #595959;
+}
+.verdict-summary { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
+.vrow { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--paper-soft); }
+.vrow .sw { flex: 0 0 auto; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.15); }
+.vrow .vlabel { flex: 1; font-size: 13.5px; color: var(--ink); }
+.vrow .vcount { font-family: var(--font-mono); font-size: 16px; font-weight: 600; color: var(--ink); min-width: 2ch; text-align: right; }
+.legend-box .lsw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: middle; border: 1px solid rgba(0,0,0,.15); }
+/* Per-claim card rails in the paper palette (override earlier rules) */
+.claim-card.verdict-supported     { border-left-color: var(--hn-supported); }
+.claim-card.verdict-partial       { border-left-color: var(--hn-partial); }
+.claim-card.verdict-not-supported { border-left-color: var(--hn-notsupp); }
+.claim-card.verdict-contradicted  { border-left-color: var(--hn-contra); }
+.claim-card.verdict-not-found     { border-left-color: var(--hn-noexist); }
+.claim-card.verdict-noaccess      { border-left-color: var(--hn-noaccess); }
+/* Badges in the paper palette */
+.badge-hn-supported { background: var(--hn-supported); color: #fff; }
+.badge-hn-partial   { background: var(--hn-partial);   color: #12351f; }
+.badge-hn-notsupp   { background: var(--hn-notsupp);   color: #5c4d00; }
+.badge-hn-contra    { background: var(--hn-contra);    color: #fff; }
+.badge-hn-noexist   { background: var(--hn-noexist);   color: #fff; }
+.badge-hn-noaccess  { background: var(--hn-noaccess);  color: #fff; }
