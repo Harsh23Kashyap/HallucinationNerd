@@ -71,7 +71,27 @@ def resolve_references(full_text: str) -> dict:
         entry_text = match[3].strip()
         refs[num] = _parse_single_reference(entry_text)
 
-    # If no numbered refs found, try to parse as unnumbered list
+    # Validate the numbered parse. PDF text is full of spurious "\\n12." hits
+    # (years, table rows, page numbers) that produce junk keys like "1543" or
+    # fragment a real key ("[10]" -> key "1" + text "0: ..."). Real numbered
+    # bibliographies have plausible key ranges and year/identifier-bearing
+    # entries; junk parses do not.
+    if refs:
+        plausible = {k: v for k, v in refs.items()
+                     if k.isdigit() and 1 <= int(k) <= 400}
+        bib_like = [k for k, v in plausible.items() if _looks_like_bib_entry(v.get("raw", ""))]
+        if not plausible or len(bib_like) < max(2, 0.5 * len(plausible)):
+            refs = {}  # junk parse — author-year parsing below takes over
+        else:
+            refs = plausible
+
+    # Author-year (unnumbered) bibliographies: parse alongside and merge.
+    # Keys are "surnameYEAR" so they never collide with numeric keys.
+    ay_refs = _parse_author_year_refs(ref_section)
+    for k, v in ay_refs.items():
+        refs.setdefault(k, v)
+
+    # Last resort: unnumbered list, one entry per line
     if not refs:
         lines = [l.strip() for l in ref_section.split('\n') if l.strip() and len(l.strip()) > 20]
         for i, line in enumerate(lines[:50], 1):  # cap at 50 refs
@@ -177,6 +197,162 @@ def _parse_single_reference(entry_text: str) -> dict:
             info["title"] = cand
 
     return info
+
+
+# ---------------------------------------------------------------------------
+# Author-year (unnumbered) bibliography support.
+# Many real papers (ACL/NeurIPS/ICML style) have NO [n] markers: the body cites
+# "(Vaswani et al., 2017)" and the bibliography lists "Vaswani, A., ... 2017."
+# or "Ashish Vaswani, Noam Shazeer, ... 2017. Attention is all you need. ...".
+# These entries are keyed "surnameYEAR" (e.g. "vaswani2017") so claim-side
+# author-year citations map onto them.
+# ---------------------------------------------------------------------------
+
+# An entry START is a line beginning with an author list, either
+# surname-first ("Abadi, M.,") or firstname-first ("Alan Akbik,").
+_AY_CHARS = r"A-Za-z\u00c0-\u017f\u00a8\u00b4'\u2019\-"
+
+_AY_ENTRY_START = re.compile(
+    r"(?:^|\n)\s*(?:"
+    r"[A-Z][" + _AY_CHARS + r"]{1,30},\s+[A-Z][a-z]?\.?"   # Surname, F.
+    r"|[A-Z][a-z]{1,30}\s+(?:[A-Z]\.\s+)?[A-Z][" + _AY_CHARS + r"]{1,30},\s"  # First Last,
+    r")"
+)
+_AY_YEAR = re.compile(r"(?<![\d.])(?:19|20)\d{2}[a-z]?(?![\d])")
+_AY_STRIP_IDS = re.compile(
+    r"arXiv[:\s]*\d{4}\.\d{4,5}(v\d+)?|abs/\d{4}\.\d{4,5}|10\.\d{4,}/\S+|https?://\S+",
+    re.IGNORECASE,
+)
+
+
+def _first_author_surname(entry_text: str) -> str:
+    """First author's surname from the start of a bibliography entry."""
+    head = entry_text.lstrip()[:200]
+    m = re.match(r"([A-Z][" + _AY_CHARS + r"]{1,30}),\s+[A-Z][a-z]?\.?", head)
+    if m:  # surname-first
+        return m.group(1)
+    m = re.match(r"[A-Z][a-z]{1,30}\s+(?:[A-Z]\.\s+)?([A-Z][" + _AY_CHARS + r"]{1,30}),", head)
+    if m:  # firstname-first
+        return m.group(1)
+    return ""
+
+
+def _looks_like_bib_entry(text: str) -> bool:
+    """A real bibliography entry almost always carries a year or an identifier."""
+    return bool(_AY_YEAR.search(_AY_STRIP_IDS.sub(" ", text))
+                or re.search(r"arxiv|doi|https?://", text, re.IGNORECASE))
+
+
+# Venue / container markers that terminate a title.
+_AY_VENUE = re.compile(
+    r"\.?\s+(?:In\s|arXiv\b|CoRR\b|Journal\b|Proceedings\b|Advances\b|Nature\b|"
+    r"Science\b|Cell\b|IEEE\b|ACM\b|Transactions\b|pp\.|pages\s|"
+    r"Techn(?:ical|ology)\b|Neural Information\b|Association for\b|volume\s|vol\.)",
+    re.IGNORECASE,
+)
+
+
+# Leading author-list stripping for title extraction. The style is decided ONCE
+# from the first unit (the two styles are otherwise ambiguous and an alternation
+# misparses). Surname-first: "Abadi, M." / "Alayrac, J.-B." / "De Fauw, J.".
+# Firstname-first: "Alan Akbik" / "Rami Al-Rfou". Multi-word surnames allowed.
+_AY_SURNAME = r"[A-Z][" + _AY_CHARS + r"]{0,29}(?:\s+[A-Z][a-z][" + _AY_CHARS + r"]{0,29})?"
+_AY_INITIALS = r"(?:[A-Z]\u2019?\.-?\s?)*[A-Z]\u2019?\."   # must END with a period
+_AY_PARTICLE = r"(?:\s+[a-z]{1,3}\.)?"                        # "Freitas, N. d."
+_AY_FF_FIRST = r"[A-Z][" + _AY_CHARS + r"]{1,30}"               # "Minh-Thang" ok
+_AY_SF_PROBE = re.compile(r"^\s*" + _AY_SURNAME + r",\s+" + _AY_INITIALS)
+_AY_FF_PROBE = re.compile(r"^\s*" + _AY_FF_FIRST + r"\s+(?:[A-Z]\.\s+)?" + _AY_SURNAME + r"[,\.\s]")
+_AY_SF_UNIT = re.compile(r"^\s*" + _AY_SURNAME + r",\s+" + _AY_INITIALS + _AY_PARTICLE + r",?\s*")
+_AY_FF_UNIT = re.compile(r"^\s*" + _AY_FF_FIRST + r"\s+(?:[A-Z]\.\s+)?" + _AY_SURNAME + r"[.,]?\s*")
+_AY_CONNECTOR = re.compile(r"^\s*(?:and|&)\s+")
+_AY_ETAL = re.compile(r"^,?\s*et\s+al\.?\s*", re.IGNORECASE)
+
+
+def _ay_strip_authors(text: str) -> str:
+    """Remove the leading author list; stop at the first non-author text."""
+    if _AY_SF_PROBE.match(text):
+        unit = _AY_SF_UNIT
+    elif _AY_FF_PROBE.match(text):
+        unit = _AY_FF_UNIT
+    else:
+        return text
+    rest = text
+    for _ in range(60):  # hard cap; author lists are finite
+        for pat in (_AY_ETAL, _AY_CONNECTOR, unit):
+            new = pat.sub("", rest, count=1)
+            if new != rest:
+                rest = new
+                break
+        else:
+            break
+    return rest
+
+
+def _ay_extract_title(entry: str) -> str:
+    """Best-effort title for an author-year bibliography entry."""
+    clean = _AY_STRIP_IDS.sub(" ", entry)
+    clean = re.sub(r"\s+", " ", clean).strip()
+    quoted = re.search(r'["\u201c\u201d\u2018\u2019](.+?)["\u201c\u201d\u2018\u2019]', clean)
+    if quoted and len(quoted.group(1)) > 6:
+        return quoted.group(1).strip()
+    rest = _ay_strip_authors(clean).lstrip(". \u2019'")
+    # ACL style: "2018. Title. In Venue..." — skip a leading year segment.
+    m = re.match(r"^(?:19|20)\d{2}[a-z]?\.\s*", rest)
+    if m:
+        rest = rest[m.end():]
+    # Title runs until the venue/container marker.
+    vm = _AY_VENUE.search(rest)
+    title = rest[:vm.start()] if vm else rest
+    title = title.strip().strip(".").strip()
+    # Drop a trailing ", 2016"-type fragment.
+    title = re.sub(r",?\s*(?:19|20)\d{2}[a-z]?$", "", title).strip().strip(",")
+    if 8 < len(title) < 250:
+        return title
+    return ""
+
+
+def _parse_author_year_refs(ref_section: str) -> dict:
+    """Parse an unnumbered (author-year) bibliography into surnameYEAR-keyed refs."""
+    starts = []
+    for m in _AY_ENTRY_START.finditer(ref_section):
+        s = m.start()
+        # A wrapped author-list continuation line ("Bernardo Magnini,") also
+        # matches the start pattern; only accept a start when the preceding
+        # entry actually ended (sentence-final period) or at section start.
+        prev = ref_section[:s].rstrip()
+        if prev and not prev.endswith((".", "}", "\u201d", '"')):
+            continue
+        starts.append(s)
+    refs = {}
+    for i, s in enumerate(starts):
+        e = starts[i + 1] if i + 1 < len(starts) else len(ref_section)
+        entry = ref_section[s:e].strip()
+        # PDF line wraps hyphen-split words ("Robin-\nson", "Man-\nning").
+        entry = re.sub(r"([A-Za-z])-\s*\n\s*([a-z])", r"\1\2", entry)
+        if len(entry) < 25:
+            continue
+        surname = _first_author_surname(entry)
+        if not surname:
+            continue
+        ym = _AY_YEAR.search(_AY_STRIP_IDS.sub(" ", entry))
+        if not ym:
+            continue
+        key = f"{surname.lower()}{ym.group(0)}"
+        # Collision: same surname + year (2018a/2018b handled via the year
+        # suffix when present; otherwise disambiguate numerically).
+        if key in refs:
+            n = 2
+            while f"{key}~{n}" in refs:
+                n += 1
+            key = f"{key}~{n}"
+        info = _parse_single_reference(entry)
+        info["year"] = ym.group(0)[:4] if len(ym.group(0)) == 4 else ym.group(0)
+        info["authors"] = surname
+        title = _ay_extract_title(entry)
+        if title:
+            info["title"] = title
+        refs[key] = info
+    return refs
 
 
 def fetch_source_content(ref_info: dict, max_chars: int = 15000) -> Optional[str]:
@@ -642,8 +818,21 @@ def resolve_and_fetch_all(full_text: str, cited_refs: list) -> dict:
         if cached is not None:
             _, content = cached
             results[ref_key_str] = content
-        elif ref_key_str in refs:
-            to_fetch.append((ref_key_str, refs[ref_key_str], cache_key))
+            continue
+        ref_info = refs.get(ref_key_str)
+        if ref_info is None and not ref_key_str.isdigit():
+            # Author-year key miss: tolerate year-suffix / disambiguation drift
+            # ("vaswani2017" vs stored "vaswani2017~2") by surname+year prefix.
+            m = re.match(r"^([a-z\u00c0-\u017f'\-]+)((?:19|20)\d{2})", ref_key_str)
+            if m:
+                prefix = m.group(1) + m.group(2)
+                for k in (prefix, prefix + "a", prefix + "b", prefix + "~2"):
+                    if k in refs:
+                        ref_info = refs[k]
+                        cache_key = _make_cache_key(ref_info, k)
+                        break
+        if ref_info is not None:
+            to_fetch.append((ref_key_str, ref_info, cache_key))
         else:
             results[ref_key_str] = None
 
