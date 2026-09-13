@@ -13,6 +13,55 @@ import re
 from typing import List
 
 
+# --- Author-year citation support -----------------------------------------
+# Real papers cite "(Vaswani et al., 2017)", "(Devlin and Chang, 2018)",
+# "(Peters et al., 2018a; Radford et al., 2018)", or narratively
+# "Vaswani et al. (2017)". These map to resolver keys "surnameYEAR".
+_AY_CHARS = r"A-Za-z\u00c0-\u017f\u00a8\u00b4'\u2019\-"
+_AY_PAREN = re.compile(r"\(([^()]*(?:19|20)\d{2}[a-z]?[^()]*)\)")
+_AY_PART = re.compile(
+    r"([A-Z][" + _AY_CHARS + r"]+)"
+    r"(?:\s+et\s+al\.?|\s+(?:and|&)\s+[A-Z][" + _AY_CHARS + r"]+)?"
+    r"\s*,?\s*((?:19|20)\d{2}[a-z]?)"
+)
+_AY_NARRATIVE = re.compile(
+    r"\b([A-Z][" + _AY_CHARS + r"]+(?:\s+et\s+al\.?)?)\s+\(((?:19|20)\d{2}[a-z]?)\)"
+)
+# Words that look like surnames in "(Word, 2019)" but are not citations.
+_AY_STOPWORDS = {
+    "table", "figure", "fig", "section", "sec", "appendix", "equation", "eq",
+    "see", "e.g", "i.e", "cf", "aka", "in", "from", "published", "circa",
+    # venues / non-citation parentheticals: "(NIPS 2017)", "(ICML, 2019)"
+    "nips", "neurips", "icml", "iclr", "acl", "emnlp", "naacl", "eacl",
+    "cvpr", "iccv", "eccv", "aaai", "ijcai", "kdd", "www", "sigir",
+    "coling", "interspeech", "corr", "arxiv", "usa", "inc", "press",
+}
+
+
+def _author_year_refs(sentence: str) -> List[str]:
+    """Extract author-year citation keys ("vaswani2017") from a sentence."""
+    keys = []
+
+    def _add(surname: str, year: str):
+        surname = surname.strip()
+        if surname.lower() in _AY_STOPWORDS:
+            return
+        keys.append(f"{surname.lower()}{year}")
+
+    # PDF wraps hyphen-split surnames across lines ("Rad- ford"); rejoin for
+    # key extraction only (claim text is left untouched).
+    sentence = re.sub(r"([A-Za-z])- ([a-z])", r"\1\2", sentence)
+    for paren in _AY_PAREN.findall(sentence):
+        for part in paren.split(";"):
+            m = _AY_PART.search(part)
+            if m:
+                _add(m.group(1), m.group(2))
+    for m in _AY_NARRATIVE.finditer(sentence):
+        surname = m.group(1).replace(" et al.", "").replace(" et al", "")
+        _add(surname, m.group(2))
+    return keys
+
+
 def _strip_leading_heading(text: str) -> str:
     """Remove a leading section number like '3 ' or '3.1 ' that PDF extraction
     sometimes glues onto the start of a claim (e.g. '3 Model Architecture ...')."""
@@ -42,6 +91,8 @@ def extract_uncited_claims_from_text(text: str, max_claims: int = 25) -> List[di
         if not (40 <= len(clean) <= 400):
             continue
         if re.search(r'\[\d', clean):          # has a citation -> not uncited
+            continue
+        if _author_year_refs(clean):             # author-year citation -> not uncited
             continue
         if not re.search(r'[a-z]', clean):      # skip ALL-CAPS headings
             continue
@@ -113,9 +164,11 @@ def extract_cited_claims_from_text(text: str, max_claims: int = 200) -> List[dic
         if not sent or len(sent) < 30:
             continue
 
-        # Find all citation markers in this sentence
+        # Find all citation markers in this sentence ([n] numeric and/or
+        # author-year "(Vaswani et al., 2017)")
         matches = cite_pattern.findall(sent)
-        if not matches:
+        ay_refs = _author_year_refs(sent)
+        if not matches and not ay_refs:
             continue
 
         # Parse citation numbers
@@ -136,6 +189,7 @@ def extract_cited_claims_from_text(text: str, max_claims: int = 200) -> List[dic
                     if num.isdigit():
                         cited_refs.append(int(num))
 
+        cited_refs.extend(ay_refs)
         if not cited_refs:
             continue
 
@@ -157,7 +211,7 @@ def extract_cited_claims_from_text(text: str, max_claims: int = 200) -> List[dic
 
         claims.append({
             "claim_text": clean,
-            "cited_refs": sorted(set(cited_refs)),
+            "cited_refs": sorted(set(cited_refs), key=str),
         })
 
         if len(claims) >= max_claims:
