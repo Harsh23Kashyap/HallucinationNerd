@@ -56,7 +56,6 @@ form.addEventListener('submit', async (e) => {
     const _df = document.getElementById('doneFlag'); if (_df) _df.classList.add('hidden');
     claimsList.innerHTML = '';
     document.getElementById('detailsHeader').style.display = 'none';
-    document.getElementById('categoryReport').querySelectorAll('[id^="cat"]').forEach(el => el.classList.add('hidden'));
     loadingState.classList.remove('hidden');
     submitBtn.disabled = true;
 
