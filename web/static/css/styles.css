@@ -542,53 +542,36 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); box-shado
   border-top: 1px solid var(--line);
 }
 
-.claims-list { display: flex; flex-direction: column; gap: 12px; }
+.claims-list { display: flex; flex-direction: column; gap: 0; }
 
 .claim-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--gray-rail);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
-  padding: 16px 18px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 18px 4px 20px;
 }
 
-.claim-card.verdict-supported     { border-left-color: var(--ok-rail); }
-.claim-card.verdict-partial       { border-left-color: var(--warn-rail); }
-.claim-card.verdict-not-supported { border-left-color: var(--bad-rail); }
-.claim-card.verdict-contradicted  { border-left-color: var(--contra-rail); }
-.claim-card.verdict-backup-found  { border-left-color: var(--teal-rail); }
-.claim-card.verdict-no-backup     { border-left-color: var(--orange-rail); }
-.claim-card.verdict-unverifiable  { border-left-color: var(--gray-rail); }
+/* verdict color lives on the wordmark (text + dot), not a rail */
 
 .claim-top {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: baseline;
   gap: 12px;
   margin-bottom: 10px;
 }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  padding: 4px 10px;
-  border-radius: 99px;
-  white-space: nowrap;
+.claim-idx {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-mute);
+  flex: 0 0 auto;
 }
 
-.badge-supported     { background: var(--ok-bg);     color: var(--ok); }
-.badge-partial       { background: var(--warn-bg);   color: var(--warn); }
-.badge-not-supported { background: var(--bad-bg);    color: var(--bad); }
-.badge-contradicted  { background: var(--contra-bg); color: var(--contra); }
-.badge-backup-found  { background: var(--teal-bg);   color: var(--teal); }
-.badge-no-backup     { background: var(--orange-bg); color: var(--orange); }
-.badge-no-citation   { background: var(--violet-bg); color: var(--violet); }
-.badge-unverifiable  { background: var(--gray-bg);   color: var(--gray); }
+.claim-top .verdict-wordmark { flex: 1; }
+
+/* pills removed - verdicts render as wordmarks (see .verdict-wordmark) */
 
 .conf {
   display: flex;
@@ -601,8 +584,8 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); box-shado
 }
 
 .conf .conf-track {
-  width: 48px; height: 4px;
-  background: var(--gray-bg);
+  width: 56px; height: 3px;
+  background: var(--line);
   border-radius: 99px;
   overflow: hidden;
 }
@@ -610,30 +593,47 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); box-shado
 .conf .conf-fill { display: block; height: 100%; background: var(--ink-soft); border-radius: 99px; }
 
 .claim-text {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.6;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.55;
   color: var(--ink);
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   overflow-wrap: anywhere;
 }
 
 .claim-refs {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-mute);
-  margin: 0 0 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 6px;
 }
 
-.claim-card details { margin-top: 8px; }
+.ref-chip {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 7px;
+  background: var(--paper-soft);
+}
+
+.claim-card details { margin-top: 6px; }
 
 .claim-card summary {
-  font-size: 12.5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--accent-deep);
   cursor: pointer;
   user-select: none;
+  list-style: none;
 }
+
+.claim-card summary::-webkit-details-marker { display: none; }
 
 .claim-card summary:hover { text-decoration: underline; text-underline-offset: 2px; }
 
@@ -785,20 +785,30 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); box-shado
 .vrow .vlabel { flex: 1; font-size: 13.5px; color: var(--ink); }
 .vrow .vcount { font-family: var(--font-mono); font-size: 16px; font-weight: 600; color: var(--ink); min-width: 2ch; text-align: right; }
 .legend-box .lsw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: middle; border: 1px solid rgba(0,0,0,.15); }
-/* Per-claim card rails in the paper palette (override earlier rules) */
-.claim-card.verdict-supported     { border-left-color: var(--hn-supported); }
-.claim-card.verdict-partial       { border-left-color: var(--hn-partial); }
-.claim-card.verdict-not-supported { border-left-color: var(--hn-notsupp); }
-.claim-card.verdict-contradicted  { border-left-color: var(--hn-contra); }
-.claim-card.verdict-not-found     { border-left-color: var(--hn-noexist); }
-.claim-card.verdict-noaccess      { border-left-color: var(--hn-noaccess); }
-/* Badges in the paper palette */
-.badge-hn-supported { background: var(--hn-supported); color: #fff; }
-.badge-hn-partial   { background: var(--hn-partial);   color: #12351f; }
-.badge-hn-notsupp   { background: var(--hn-notsupp);   color: #5c4d00; }
-.badge-hn-contra    { background: var(--hn-contra);    color: #fff; }
-.badge-hn-noexist   { background: var(--hn-noexist);   color: #fff; }
-.badge-hn-noaccess  { background: var(--hn-noaccess);  color: #fff; }
+/* Verdict wordmarks: small color square + uppercase letterspaced label.
+   Same six verdict colors as the summary panel, applied as text + dot. */
+.verdict-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.verdict-wordmark .vw-dot { width: 9px; height: 9px; border-radius: 2px; background: currentColor; flex: 0 0 auto; }
+
+.badge-hn-supported, .badge-supported     { color: var(--ok); }
+.badge-hn-partial, .badge-partial         { color: var(--warn); }
+.badge-hn-notsupp, .badge-not-supported   { color: var(--bad); }
+.badge-hn-contra, .badge-contradicted     { color: var(--contra); }
+.badge-hn-noexist                         { color: var(--violet); }
+.badge-hn-noaccess, .badge-unverifiable   { color: var(--gray); }
+.badge-backup-found                       { color: var(--teal); }
+.badge-no-backup                          { color: var(--orange); }
+.badge-no-citation                        { color: var(--violet); }
 
 
 /* ===== Clickable category filtering ===== */
