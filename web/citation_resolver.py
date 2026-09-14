@@ -245,12 +245,14 @@ def _all_author_surnames(head: str) -> list:
     C = _AY_CHARS
     out = []
     for m in re.finditer(
-        r"((?:" + _AY_NOBILIARY + r"\s+){0,3}[A-Z][" + C + r"]{1,30}(?:\s+[A-Z][" + C + r"]{1,30}){0,2}),\s*(?:[A-Z]\.\s*-?){1,4}",
+        r"((?:" + _AY_NOBILIARY + r"\s+){0,3}[A-Z][" + C + r"]{1,30}(?:\s+[A-Z][" + C + r"]{1,30}){0,2}),\s*(?:[A-ZÀ-Þ]\.\s*-?){1,4}",
         head,
     ):
-        sn = _surname_head(m.group(1))
-        if sn:
-            out.append(sn)
+        # A surname phrase may be compound ("Atsa Etoundi", "Fouda Ndjodo"); the
+        # paper may cite by ANY of its capitalized words, so register them all.
+        for w in re.findall(r"[A-Z][" + C + r"]*", m.group(1)):
+            if len(w) >= 2:
+                out.append(w)
     return out
 
 
