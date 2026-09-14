@@ -629,6 +629,12 @@ def _search_and_fetch(query: str) -> Optional[str]:
     if result:
         return result
 
+    # Try OpenAlex (separate infra, survives arXiv/S2 outages, and its arXiv
+    # locations fetch fine even when the export API 429s)
+    result = _search_openalex(query)
+    if result:
+        return result
+
     # Try Semantic Scholar (rate limited without API key)
     result = _search_semantic_scholar(query)
     if result:
@@ -756,6 +762,42 @@ def _search_arxiv_by_title(query: str) -> Optional[str]:
     except Exception:
         pass
     return None
+
+
+def _search_openalex(query: str) -> Optional[str]:
+    """Search OpenAlex by title and follow the arXiv location when it matches.
+
+    OpenAlex indexes arXiv preprints alongside venues, runs on separate
+    infrastructure from the arXiv export API and Semantic Scholar, and stays
+    responsive when both rate-limit us. Same relevance standard as the other
+    legs: the title guard applies before any fetch.
+    """
+    _rate_limit()
+    try:
+        resp = requests.get(
+            "https://api.openalex.org/works",
+            params={"search": query[:120], "per-page": 5},
+            headers={"User-Agent": "HallucinationNerd/1.0 (citation verification)"},
+            timeout=12,
+        )
+        if resp.status_code != 200:
+            return None
+        for work in resp.json().get("results", []) or []:
+            cand_title = str(work.get("display_name", "") or "")
+            if not cand_title or not _title_matches(query, cand_title):
+                continue
+            for loc in work.get("locations", []) or []:
+                for u in (loc.get("landing_page_url"), loc.get("pdf_url")):
+                    u = str(u or "")
+                    m = re.search(r"arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5})(v\d+)?", u)
+                    if m:
+                        text = _fetch_arxiv(m.group(1))
+                        if text:
+                            return text
+            # Title matched but no usable arXiv location: keep looking.
+        return None
+    except Exception:
+        return None
 
 
 def _search_semantic_scholar(query: str) -> Optional[str]:
