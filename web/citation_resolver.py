@@ -263,10 +263,10 @@ def _first_author_surname(entry_text: str) -> str:
     C = _AY_CHARS
     # surname-first, tolerating leading lowercase particles: "van der Aalst, W.M.P."
     m = re.match(
-        r"((?:" + _AY_NOBILIARY + r"\s+){0,3}[A-Z][" + C + r"]{1,30}(?:\s+[A-Z][" + C + r"]{1,30}){0,2}),\s+[A-Z]",
+        r"((?:" + _AY_NOBILIARY + r"\s+){0,3}[A-Z][" + C + r"]{1,30}(?:\s+[A-Z][" + C + r"]{1,30}){0,2}),\s+[A-Z\u00c0-\u00de]\.",
         head,
     )
-    if m:  # surname-first
+    if m:  # surname-first (post-comma is an initial like "W." / "R.")
         return _surname_head(m.group(1))
     m = re.match(r"[A-Z][a-z]{1,30}\s+(?:[A-Z]\.?\s+)?((?:" + _AY_NOBILIARY + r"\s+){0,3}[A-Z][" + C + r"]{1,30}),", head)
     if m:  # firstname-first "Alan Akbik," / "Wil van der Aalst,"
