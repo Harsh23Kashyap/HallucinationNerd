@@ -212,11 +212,14 @@ def _parse_single_reference(entry_text: str) -> dict:
 # surname-first ("Abadi, M.,") or firstname-first ("Alan Akbik,").
 _AY_CHARS = r"A-Za-z\u00c0-\u017f\u00a8\u00b4'\u2019\-"
 
+# Lowercase nobiliary particles that can precede a surname ("van der Aalst").
+_AY_NOBILIARY = r"(?:van|von|de|del|della|der|den|di|da|dos|das|du|la|le|el|ter|ten|te|st)"
+
 _AY_ENTRY_START = re.compile(
     r"(?:^|\n)\s*(?:"
-    r"[A-Z][" + _AY_CHARS + r"]{1,30},\s+[A-Z][a-z]?\.?"   # Surname, F.
-    r"|[A-Z][a-z]{1,30}\s+(?:[A-Z]\.?\s+)?[A-Z][" + _AY_CHARS + r"]{1,30}(?:,\s|\s+and\s+)"  # First Last(, / and)
-    r"|(?:[A-Z]\.-?)+\s+[A-Z][" + _AY_CHARS + r"]{1,30},\s"  # J. Deng,
+    r"(?:" + _AY_NOBILIARY + r"\s+){0,3}[A-Z][" + _AY_CHARS + r"]{1,30}(?:\s+[A-Z][" + _AY_CHARS + r"]{1,30}){0,2},\s+[A-Z][a-z]?\.?"   # (van der) Surname, F.
+    r"|[A-Z][a-z]{1,30}\s+(?:[A-Z]\.?\s+)?(?:" + _AY_NOBILIARY + r"\s+){0,3}[A-Z][" + _AY_CHARS + r"]{1,30}(?:,\s|\s+and\s+)"  # First (van) Last(, / and)
+    r"|(?:[A-Z]\.-?)+\s+(?:" + _AY_NOBILIARY + r"\s+){0,3}[A-Z][" + _AY_CHARS + r"]{1,30},\s"  # J. (van) Deng,
     r")"
 )
 _AY_YEAR = re.compile(r"(?<![\d.])(?:19|20)\d{2}[a-z]?(?![\d])")
@@ -226,19 +229,52 @@ _AY_STRIP_IDS = re.compile(
 )
 
 
+
+def _surname_head(phrase: str) -> str:
+    """The key surname from a name phrase: the FIRST capitalized word, matching
+    the claim side (which keys "(van der Aalst, 1999)" -> "aalst"). Particles
+    are lowercase and thus skipped automatically."""
+    caps = re.findall(r"[A-Z][" + _AY_CHARS + r"]*", phrase)
+    return caps[0] if caps else ""
+
+
+def _all_author_surnames(head: str) -> list:
+    """Every author surname in an author-list head (particle-aware), so a
+    citation by a co-author -- e.g. "(van der Aalst, 2008)" for an entry whose
+    FIRST author is someone else -- still resolves."""
+    C = _AY_CHARS
+    out = []
+    for m in re.finditer(
+        r"((?:" + _AY_NOBILIARY + r"\s+){0,3}[A-Z][" + C + r"]{1,30}(?:\s+[A-Z][" + C + r"]{1,30}){0,2}),\s*(?:[A-Z]\.\s*-?){1,4}",
+        head,
+    ):
+        sn = _surname_head(m.group(1))
+        if sn:
+            out.append(sn)
+    return out
+
+
 def _first_author_surname(entry_text: str) -> str:
-    """First author's surname from the start of a bibliography entry."""
+    """First author's surname from the start of a bibliography entry, keyed the
+    same way the claim side keys inline citations (particle-aware)."""
     head = entry_text.lstrip()[:200]
-    m = re.match(r"([A-Z][" + _AY_CHARS + r"]{1,30}),\s+[A-Z][a-z]?\.?", head)
+    C = _AY_CHARS
+    # surname-first, tolerating leading lowercase particles: "van der Aalst, W.M.P."
+    m = re.match(
+        r"((?:" + _AY_NOBILIARY + r"\s+){0,3}[A-Z][" + C + r"]{1,30}(?:\s+[A-Z][" + C + r"]{1,30}){0,2}),\s+[A-Z]",
+        head,
+    )
     if m:  # surname-first
-        return m.group(1)
-    m = re.match(r"[A-Z][a-z]{1,30}\s+(?:[A-Z]\.?\s+)?([A-Z][" + _AY_CHARS + r"]{1,30}),", head)
-    if m:  # firstname-first
-        return m.group(1)
-    m = re.match(r"(?:[A-Z]\.-?)+\s+([A-Z][" + _AY_CHARS + r"]{1,30}),", head)
-    if m:  # initial-first: "J. Deng,"
-        return m.group(1)
-    m = re.match(r"[A-Z][a-z]{1,30}\s+(?:[A-Z]\.\s+)?([A-Z][" + _AY_CHARS + r"]{1,30})\s+and\s+", head)
+        return _surname_head(m.group(1))
+    m = re.match(r"[A-Z][a-z]{1,30}\s+(?:[A-Z]\.?\s+)?((?:" + _AY_NOBILIARY + r"\s+){0,3}[A-Z][" + C + r"]{1,30}),", head)
+    if m:  # firstname-first "Alan Akbik," / "Wil van der Aalst,"
+        # surname is the LAST capitalized word here (first name precedes it)
+        caps = re.findall(r"[A-Z][" + C + r"]*", m.group(1))
+        return caps[0] if caps else ""
+    m = re.match(r"(?:[A-Z]\.-?)+\s+((?:" + _AY_NOBILIARY + r"\s+){0,3}[A-Z][" + C + r"]{1,30}),", head)
+    if m:  # initial-first: "J. Deng," / "W. van der Aalst,"
+        return _surname_head(m.group(1))
+    m = re.match(r"[A-Z][a-z]{1,30}\s+(?:[A-Z]\.\s+)?([A-Z][" + C + r"]{1,30})\s+and\s+", head)
     if m:  # firstname-first, two-author "Jeremy Howard and Sebastian Ruder."
         return m.group(1)
     return ""
@@ -363,6 +399,14 @@ def _parse_author_year_refs(ref_section: str) -> dict:
         if title:
             info["title"] = title
         refs[key] = info
+        # Also index by every author surname + year, so a citation by a
+        # co-author resolves to this same entry (the first-author key wins).
+        yr = ym.group(0)
+        head_by = entry[:entry.find(yr)] if yr in entry else entry[:150]
+        for sn in _all_author_surnames(head_by):
+            k2 = f"{sn.lower()}{yr}"
+            if k2 not in refs:
+                refs[k2] = info
     return refs
 
 
