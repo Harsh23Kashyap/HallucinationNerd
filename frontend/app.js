@@ -164,19 +164,24 @@ function renderResults(data) {
         }
         const confPct = claim.confidence ? Math.round(claim.confidence * 100) : 0;
         const confHtml = claim.confidence
-            ? `<span class="conf"><span class="conf-track"><span class="conf-fill" style="width:${confPct}%"></span></span>${confPct}% conf.</span>`
+            ? `<span class="conf"><span class="conf-track"><span class="conf-fill" style="width:${confPct}%"></span></span>${confPct}%</span>`
+            : '';
+
+        const refChips = (claim.cited_refs && claim.cited_refs.length)
+            ? `<p class="claim-refs">${claim.cited_refs.map(r => `<span class="ref-chip">${escapeHtml(r)}</span>`).join('')}</p>`
             : '';
 
         card.innerHTML = `
             <div class="claim-top">
-                <span class="badge ${verdictBadge.class}">${verdictBadge.label}</span>
+                <span class="claim-idx">${String(i + 1).padStart(2, '0')}</span>
+                <span class="verdict-wordmark ${verdictBadge.class}"><span class="vw-dot"></span>${verdictBadge.label}</span>
                 ${confHtml}
             </div>
-            <p class="claim-text">"${escapeHtml(claim.claim)}"</p>
-            ${claim.cited_refs && claim.cited_refs.length ? `<p class="claim-refs">Cited: [${claim.cited_refs.join(', ')}]</p>` : ''}
+            <p class="claim-text">${escapeHtml(claim.claim)}</p>
+            ${refChips}
             ${claim.evidence_quote ? `
                 <details>
-                    <summary>Show evidence</summary>
+                    <summary>Evidence</summary>
                     <blockquote>${escapeHtml(claim.evidence_quote)}</blockquote>
                 </details>
             ` : ''}
