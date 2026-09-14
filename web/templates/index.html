@@ -126,13 +126,14 @@
                         <span id="summaryText" class="hidden"></span>
                     </div>
                     <div class="verdict-summary" id="verdictSummary">
-                        <div class="vrow"><span class="sw" style="background:#1B7F3B"></span><span class="vlabel">Supported</span><span class="vcount" id="vcSupported">0</span></div>
-                        <div class="vrow"><span class="sw" style="background:#A6E0B3"></span><span class="vlabel">Partially supported</span><span class="vcount" id="vcPartial">0</span></div>
-                        <div class="vrow"><span class="sw" style="background:#F2D64B"></span><span class="vlabel">Not supported</span><span class="vcount" id="vcNotSupported">0</span></div>
-                        <div class="vrow"><span class="sw" style="background:#E0392B"></span><span class="vlabel">Contradicted</span><span class="vcount" id="vcContradicted">0</span></div>
-                        <div class="vrow"><span class="sw" style="background:#000000"></span><span class="vlabel">Cited article doesn&#39;t exist</span><span class="vcount" id="vcNotFound">0</span></div>
-                        <div class="vrow"><span class="sw" style="background:#595959"></span><span class="vlabel">Could not access</span><span class="vcount" id="vcNoAccess">0</span></div>
+                        <div class="vrow" data-cat="SUPPORTED"><span class="sw" style="background:#1B7F3B"></span><span class="vlabel">Supported</span><span class="vcount" id="vcSupported">0</span></div>
+                        <div class="vrow" data-cat="PARTIALLY_SUPPORTED"><span class="sw" style="background:#A6E0B3"></span><span class="vlabel">Partially supported</span><span class="vcount" id="vcPartial">0</span></div>
+                        <div class="vrow" data-cat="NOT_SUPPORTED"><span class="sw" style="background:#F2D64B"></span><span class="vlabel">Not supported</span><span class="vcount" id="vcNotSupported">0</span></div>
+                        <div class="vrow" data-cat="CONTRADICTED"><span class="sw" style="background:#E0392B"></span><span class="vlabel">Contradicted</span><span class="vcount" id="vcContradicted">0</span></div>
+                        <div class="vrow" data-cat="CITATION_NOT_FOUND"><span class="sw" style="background:#000000"></span><span class="vlabel">Cited article doesn&#39;t exist</span><span class="vcount" id="vcNotFound">0</span></div>
+                        <div class="vrow" data-cat="NOACCESS"><span class="sw" style="background:#595959"></span><span class="vlabel">Could not access</span><span class="vcount" id="vcNoAccess">0</span></div>
                     </div>
+                    <p class="filter-hint" id="filterHint">Tip: click a category to show only those claims (click again to clear).</p>
 
                     <details class="legend-box">
                         <summary>What do these result codes mean?</summary>

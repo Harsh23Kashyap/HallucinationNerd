@@ -135,11 +135,13 @@ function renderResults(data) {
 
     // Show detailed claims header
     document.getElementById('detailsHeader').style.display = 'block';
+    resetCategoryFilter();
 
     // Render each claim card
     data.claims.forEach((claim, i) => {
         const card = document.createElement('div');
         card.className = `claim-card fade-in ${getVerdictClass(claim.verdict)}`;
+        card.dataset.cat = categoryOf(claim.verdict);
         card.style.animationDelay = `${i * 0.05}s`;
 
         const noRefs = (!claim.cited_refs || claim.cited_refs.length === 0);
@@ -187,6 +189,7 @@ function renderResults(data) {
 
         claimsList.appendChild(card);
     });
+    applyClaimFilter();
 }
 
 function getVerdictClass(verdict) {
@@ -220,3 +223,57 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+
+// ---- Category-box filtering: click a summary box to filter the claim cards ----
+function categoryOf(verdict) {
+    switch (verdict) {
+        case 'SUPPORTED': return 'SUPPORTED';
+        case 'PARTIALLY_SUPPORTED': return 'PARTIALLY_SUPPORTED';
+        case 'NOT_SUPPORTED': return 'NOT_SUPPORTED';
+        case 'CONTRADICTED': return 'CONTRADICTED';
+        case 'CITATION_NOT_FOUND': return 'CITATION_NOT_FOUND';
+        case 'INACCESSIBLE':
+        case 'UNVERIFIABLE': return 'NOACCESS';
+        default: return 'OTHER';
+    }
+}
+
+const selectedCats = new Set();
+
+function applyClaimFilter() {
+    const cards = claimsList.querySelectorAll('.claim-card');
+    cards.forEach(c => {
+        const show = selectedCats.size === 0 || selectedCats.has(c.dataset.cat);
+        c.style.display = show ? '' : 'none';
+    });
+    const hint = document.getElementById('filterHint');
+    if (hint) {
+        hint.textContent = selectedCats.size === 0
+            ? 'Tip: click a category to show only those claims (click again to clear).'
+            : 'Filtering by ' + selectedCats.size + ' categor' + (selectedCats.size === 1 ? 'y' : 'ies') + ' — click a highlighted box to clear it.';
+    }
+}
+
+function resetCategoryFilter() {
+    selectedCats.clear();
+    document.querySelectorAll('#verdictSummary .vrow').forEach(row => {
+        row.classList.remove('selected');
+        const el = row.querySelector('.vcount');
+        const cnt = parseInt((el && el.textContent) || '0', 10);
+        row.classList.toggle('disabled', cnt === 0);
+    });
+}
+
+function setupCategoryFilter() {
+    document.querySelectorAll('#verdictSummary .vrow').forEach(row => {
+        row.addEventListener('click', () => {
+            if (row.classList.contains('disabled')) return;
+            const cat = row.dataset.cat;
+            if (selectedCats.has(cat)) { selectedCats.delete(cat); row.classList.remove('selected'); }
+            else { selectedCats.add(cat); row.classList.add('selected'); }
+            applyClaimFilter();
+        });
+    });
+}
+setupCategoryFilter();

@@ -799,3 +799,12 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); box-shado
 .badge-hn-contra    { background: var(--hn-contra);    color: #fff; }
 .badge-hn-noexist   { background: var(--hn-noexist);   color: #fff; }
 .badge-hn-noaccess  { background: var(--hn-noaccess);  color: #fff; }
+
+
+/* ===== Clickable category filtering ===== */
+.filter-hint { margin: 8px 2px 0; font-size: 12px; color: var(--ink-mute); }
+.vrow { cursor: pointer; transition: border-color .12s, box-shadow .12s, background .12s; }
+.vrow:hover { border-color: var(--ink-mute); }
+.vrow.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-tint); background: var(--card); }
+.vrow.disabled { cursor: default; opacity: .5; }
+.vrow.disabled:hover { border-color: var(--line-soft); }
