@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About — HallucinationNerd</title>
+    <meta name="description" content="About HallucinationNerd: citation-level hallucination verification, how it works, and the team behind it.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="about-page">
+
+    <header class="site-header">
+        <div class="wrap">
+            <a class="brand-mark" href="/">
+                <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true">
+                    <rect x="1.5" y="1.5" width="31" height="31" rx="7" fill="#1B1712"/>
+                    <path d="M11 9.5v15M23 9.5v15" stroke="#F5F1E8" stroke-width="2.4" stroke-linecap="round"/>
+                    <path d="M11 9.5h4M11 24.5h4M23 9.5h-4M23 24.5h-4" stroke="#F5F1E8" stroke-width="2.4" stroke-linecap="round"/>
+                    <path d="M13.5 17l2.6 2.6L21 14.8" stroke="#E2603F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span class="brand-word">Hallucination<em>Nerd</em></span>
+            </a>
+            <nav class="site-nav">
+                <a href="/">Home</a>
+                <a href="/about" class="active">About</a>
+                <a href="mailto:shasha@cs.nyu.edu">Contact</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="about-main">
+
+        <h1>About Us</h1>
+        <p class="lead">
+            HallucinationNerd is a large language model-based tool that checks whether the
+            sources cited in a piece of text actually support the claims attributed to them.
+            Given any document with inline citations — a retrieval-augmented (RAG) answer, an
+            agentic system's report, or a research paper's related-work section — it breaks the
+            text into individual claims, retrieves the relevant passages from each cited source,
+            and reports, for every claim, whether the source supports it, partially supports it,
+            does not support it, or contradicts it. It works on PDFs, web pages, and plain text.
+        </p>
+
+        <h2>How It Works</h2>
+        <p class="lead">
+            HallucinationNerd runs a four-stage pipeline: it extracts atomic claims and their
+            citations, retrieves the cited source's content and locates the most relevant passage,
+            and then asks a structured LLM judge whether that source supports the claim, returning
+            a per-claim verdict with an evidence quote. For claims that carry no citation, it can
+            optionally search user-selected databases (PubMed, arXiv, Semantic Scholar) to find or
+            refute supporting evidence. A configurable strictness setting lets users trade precision
+            for recall.
+        </p>
+
+        <h2>Meet Our Team</h2>
+        <div class="team-grid">
+
+            <div class="team-card">
+                <img src="/static/img/taranum.jpg" alt="Taranum Wasu" class="avatar">
+                <div>
+                    <h3>Taranum Wasu</h3>
+                    <p class="role">Researcher</p>
+                    <p class="aff">Thapar Institute of Engineering and Technology, Patiala, India</p>
+                    <p class="li"><a href="https://www.linkedin.com/in/taranum-wasu/">LinkedIn</a></p>
+                </div>
+            </div>
+
+            <div class="team-card">
+                <img src="/static/img/harsh.jpg" alt="Harsh Kashyap" class="avatar">
+                <div>
+                    <h3>Harsh Kashyap</h3>
+                    <p class="role">Researcher</p>
+                    <p class="aff">Thapar Institute of Engineering and Technology, Patiala, India</p>
+                    <p class="li"><a href="https://www.linkedin.com/in/harsh-kashyap/">LinkedIn</a></p>
+                </div>
+            </div>
+
+            <div class="team-card">
+                <div class="avatar-ph">VC</div>
+                <div>
+                    <h3>Vishnu Chennur</h3>
+                    <p class="role">Researcher</p>
+                    <p class="aff">Downingtown STEM Academy, Downingtown, PA, USA</p>
+                    <p class="li"><a href="https://www.linkedin.com/in/vishnu-chennur-a2a166361/">LinkedIn</a></p>
+                </div>
+            </div>
+
+            <div class="team-card">
+                <img src="/static/img/dennis.jpg" alt="Dennis Shasha" class="avatar">
+                <div>
+                    <h3><a href="https://cs.nyu.edu/~shasha/">Dennis Shasha</a></h3>
+                    <p class="role">Professor of Computer Science</p>
+                    <p class="aff">Courant Institute of Mathematical Sciences, New York University, New York, USA</p>
+                </div>
+            </div>
+
+        </div>
+
+        <a class="try-btn" href="/">Try HallucinationNerd <span class="arrow">-&gt;</span></a>
+
+    </main>
+
+    <footer class="site-footer">
+        <p>HallucinationNerd · <a href="https://github.com/Taranum01/HallucinationNerd">GitHub</a></p>
+    </footer>
+
+</body>
+</html>
