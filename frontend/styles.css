@@ -818,3 +818,9 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); box-shado
 .vrow.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-tint); background: var(--card); }
 .vrow.disabled { cursor: default; opacity: .5; }
 .vrow.disabled:hover { border-color: var(--line-soft); }
+
+/* Home/About navigation */
+.corner-nav { position: fixed; top: 18px; right: 24px; z-index: 20; display: flex; gap: 6px; padding: 5px; border: 1px solid var(--line); border-radius: 999px; background: rgba(251,248,241,.94); box-shadow: var(--shadow-card); backdrop-filter: blur(8px); }
+.corner-nav a { color: var(--ink-soft); text-decoration: none; font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 999px; }
+.corner-nav a:hover, .corner-nav a.active { color: var(--ink); background: var(--accent-tint); }
+@media (max-width: 720px) { .corner-nav { top: 10px; right: 10px; } }

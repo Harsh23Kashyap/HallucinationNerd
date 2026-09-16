@@ -81,6 +81,12 @@ async def home(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
 
 
+@app.get("/about", response_class=HTMLResponse)
+async def about(request: Request):
+    """Serve the About page."""
+    return templates.TemplateResponse(request=request, name="about.html")
+
+
 @app.post("/verify")
 async def verify_document(
     request: Request,
