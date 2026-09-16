@@ -1,5 +1,14 @@
 # HallucinationNerd
 
+## About
+
+HallucinationNerd is a collaborative research project that checks whether cited sources support the claims attributed to them. The project is developed by:
+
+- **Taranum Wasu** - Thapar Institute of Engineering and Technology, Patiala, India
+- **Harsh Kashyap** - Thapar Institute of Engineering and Technology, Patiala, India
+- **Vishnu Chennur** - Downingtown STEM Academy, Downingtown, PA, USA
+- **Dennis Shasha** - Department of Computer Science, New York University, New York, USA
+
 **A citation-level hallucination verification engine for synopsis-generating systems.**
 
 HallucinationNerd checks whether cited sources actually support the claims attributed to them. Given any text with inline citations — a RAG synopsis, a research paper's Related Work, or an agentic system's report — it verifies each (claim, source) pair and returns a per-claim conclusion (verified correct, verified incorrect, cited article does not exist, or unknown) with evidence pointers.
