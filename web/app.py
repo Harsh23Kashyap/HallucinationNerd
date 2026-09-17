@@ -321,6 +321,11 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
             parsed_ref_keys = {str(k) for k in resolve_references(text).keys()}
         except Exception:
             parsed_ref_keys = set()
+    # For numbered bibliographies, the largest real reference number bounds what
+    # can be a citation; bracketed values above it (e.g. "656 s [648, 661]" IQRs)
+    # are statistics, not citations.
+    _numeric_bib = [int(k) for k in parsed_ref_keys if str(k).isdigit()]
+    _max_cite = (max(_numeric_bib) + 10) if _numeric_bib else 10**9
 
     # Step 3: Verify each claim using per-ref verification (C1 fix)
     # The old code picked the first accessible ref and verified the whole
@@ -333,6 +338,7 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
     for claim_data in claims:
         claim_text = claim_data.get("claim_text", claim_data.get("claim", ""))
         cited_refs = claim_data.get("cited_refs", [])
+        cited_refs = [r for r in cited_refs if not (str(r).isdigit() and int(r) > _max_cite)]
 
         if not cited_refs:
             # No inline citation. If the user enabled backup databases, search
