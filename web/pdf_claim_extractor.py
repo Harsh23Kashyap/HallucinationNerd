@@ -186,7 +186,9 @@ def extract_cited_claims_from_text(text: str, max_claims: int = 200) -> List[dic
                 # Handle comma-separated: "1, 2, 3"
                 for num in match.split(','):
                     num = num.strip()
-                    if num.isdigit():
+                    # Cap at a plausible citation number: brackets like
+                    # "656 s [648, 661]" are statistics (IQRs), not citations.
+                    if num.isdigit() and int(num) <= 300:
                         cited_refs.append(int(num))
 
         cited_refs.extend(ay_refs)

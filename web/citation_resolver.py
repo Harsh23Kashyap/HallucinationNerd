@@ -100,6 +100,30 @@ def resolve_references(full_text: str) -> dict:
     return refs
 
 
+# Trailing sections that can follow the bibliography (esp. in revised
+# submissions) and carry their own numbered lists, which would otherwise
+# overwrite real references. The bibliography is truncated before these.
+_AY_POST_BIB = re.compile(
+    r"(?:^|\n)\s*(?:"
+    r"Response\s+to\s+(?:the\s+)?reviewers?"
+    r"|Reviewer\s+(?:response|comments?)"
+    r"|Author\s+(?:biograph|contributions)"
+    r"|Response\s+letter"
+    r"|Rebuttal"
+    r"|Cover\s+letter"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _truncate_post_bib(section: str) -> str:
+    """Cut a bibliography section at the start of any trailing non-bib section
+    (e.g. a revision's "Response to reviewers"), whose own [1],[2]... would
+    otherwise overwrite the real references."""
+    m = _AY_POST_BIB.search(section)
+    return section[:m.start()] if m else section
+
+
 def _extract_reference_section(text: str) -> Optional[str]:
     """Extract the references/bibliography section from document text."""
     # Common section headers
@@ -114,12 +138,12 @@ def _extract_reference_section(text: str) -> Optional[str]:
     for pattern in patterns:
         match = re.search(pattern, text)
         if match:
-            return text[match.end():]
+            return _truncate_post_bib(text[match.end():])
 
     # Fallback: look for the last section that starts with [1] or 1.
     match = re.search(r'\n\s*\[1\]\s+\w', text)
     if match:
-        return text[match.start():]
+        return _truncate_post_bib(text[match.start():])
 
     return None
 
@@ -194,6 +218,24 @@ def _parse_single_reference(entry_text: str) -> dict:
                 cand = segs[0]
         # Reject candidates that are just numbers/years or too short/long.
         if cand and 8 < len(cand) < 250 and not re.fullmatch(r'[\d,\s]+', cand):
+            info["title"] = cand
+
+    # Fallback for numbered/IEEE comma-format entries where authors are
+    # "F. A. Surname," and the title is a comma-delimited segment before the
+    # venue (the period-split heuristic fails on the initials' periods).
+    if not info["title"]:
+        t = re.sub(r'^\s*\[\d+\]\s*', '', clean)
+        prev = None
+        while t != prev:
+            prev = t
+            t = re.sub(r'^(?:[A-Z]\.[- ]?){1,3}\s*[A-Z][\w\u2019\'-]+\s*,\s*', '', t)   # "Y. A. Malkov,"
+            t = re.sub(r'^[A-Z][\w\u2019\'-]+\s*,\s*(?:[A-Z]\.[- ]?){1,3}\s*,?\s*', '', t)  # "Malkov, Y. A.,"
+            t = re.sub(r'^and\s+', '', t)
+        cand = re.split(
+            r',\s*(?:IEEE|ACM|Proc\b|Proceedings|Journal|Trans\b|Advances|arXiv|CoRR|Nature|Science|In\s|vol\b|Vol\b|pp\b)',
+            t, maxsplit=1,
+        )[0].strip().rstrip('.')
+        if cand and 10 < len(cand) < 250 and not re.fullmatch(r'[\d,\s]+', cand) and re.search(r'[a-z]{3}', cand):
             info["title"] = cand
 
     return info
