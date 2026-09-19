@@ -10,6 +10,8 @@ const loadingState = document.getElementById('loadingState');
 const summaryBar = document.getElementById('summaryBar');
 const claimsList = document.getElementById('claimsList');
 const errorState = document.getElementById('errorState');
+const retryOffer = document.getElementById('retryOffer');
+const patientRetryBtn = document.getElementById('patientRetryBtn');
 
 // File upload handling
 dropZone.addEventListener('click', () => fileInput.click());
@@ -43,6 +45,14 @@ fileInput.addEventListener('change', () => {
 // Form submission
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    await runVerification(false);
+});
+
+patientRetryBtn.addEventListener('click', async () => {
+    await runVerification(true);
+});
+
+async function runVerification(patientWait) {
 
     if (!fileInput.files.length) {
         showError('Please select a file to upload.');
@@ -53,6 +63,7 @@ form.addEventListener('submit', async (e) => {
     emptyState.classList.add('hidden');
     errorState.classList.add('hidden');
     summaryBar.classList.add('hidden');
+    retryOffer.classList.add('hidden');
     const _df = document.getElementById('doneFlag'); if (_df) _df.classList.add('hidden');
     claimsList.innerHTML = '';
     document.getElementById('detailsHeader').style.display = 'none';
@@ -83,6 +94,7 @@ form.addEventListener('submit', async (e) => {
     const selectedDbs = [...document.querySelectorAll('.dbCheck:checked')].map(c => c.value);
     formData.append('databases', selectedDbs.join(','));
     formData.append('custom_database', document.getElementById('customDatabase').value.trim());
+    formData.append('patient_wait', patientWait ? 'true' : 'false');
 
     try {
         const apiBase = (window.env && window.env.API_URL) ? window.env.API_URL : '';
@@ -99,13 +111,14 @@ form.addEventListener('submit', async (e) => {
         }
 
         renderResults(data);
+        if (data.retry_offer) retryOffer.classList.remove('hidden');
     } catch (err) {
         clearInterval(progressInterval);
         loadingState.classList.add('hidden');
         submitBtn.disabled = false;
         showError('Connection error. Please try again.');
     }
-});
+}
 
 function showError(msg) {
     errorState.classList.remove('hidden');
