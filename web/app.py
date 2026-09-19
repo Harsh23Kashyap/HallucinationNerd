@@ -94,6 +94,7 @@ async def verify_document(
     source_type: str = Form(default="auto"),
     databases: str = Form(default=""),
     custom_database: str = Form(default=""),
+    patient_wait: bool = Form(default=False),
 ):
     """
     Accept a document upload, extract claims + citations, verify each one.
@@ -133,7 +134,7 @@ async def verify_document(
     db_list = [d.strip() for d in databases.split(",") if d.strip()]
     try:
         results = await asyncio.to_thread(
-            _run_verification, tmp_path, filename, suffix, source_type, db_list, custom_database.strip()
+            _run_verification, tmp_path, filename, suffix, source_type, db_list, custom_database.strip(), patient_wait
         )
         return JSONResponse(content=results)
     except Exception as e:
@@ -231,7 +232,8 @@ def _extract_citation_rich_sections(text: str, max_chars: int = 12000) -> str:
 
 
 def _run_verification(file_path: str, filename: str, suffix: str, source_type: str,
-                      databases: list = None, custom_database: str = "") -> dict:
+                      databases: list = None, custom_database: str = "",
+                      patient_wait: bool = False) -> dict:
     """
     Run the HallucinationNerd pipeline on the uploaded file.
     This runs in a thread to not block the event loop.
@@ -312,7 +314,10 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
     resolved_sources = {}
     parsed_ref_keys = set()
     if all_cited:
-        resolved_sources = resolve_and_fetch_all(text, list(all_cited))
+        if patient_wait:
+            resolved_sources = resolve_and_fetch_all(text, list(all_cited), patient=True)
+        else:
+            resolved_sources = resolve_and_fetch_all(text, list(all_cited))
         # Parsed bibliography keys: lets us distinguish a citation that doesn't
         # resolve to any bibliography entry ("cited article doesn't exist") from
         # one that is in the bibliography but whose content couldn't be fetched
@@ -539,6 +544,8 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
             "precision_percent_full": round(precision_pct, 6),
         },
         "claims": results,
+        "retry_offer": bool(getattr(resolved_sources, "throttled_refs", [])) and not patient_wait,
+        "throttled_refs": list(getattr(resolved_sources, "throttled_refs", [])),
     }
 
 
