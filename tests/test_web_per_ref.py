@@ -159,3 +159,28 @@ def test_web_per_ref_unverifiable_does_not_count_in_reliability(mock_openai, web
     # (claims that have a real source), not the total.
     # The first claim has a real source (counts as verifiable), the second
     # doesn't (NO_BACKUP_FOUND/UNVERIFIABLE). So denominator is 1, not 2.
+
+
+def test_web_offers_patient_retry_only_after_default_throttle(mock_openai, web_app_path, tmp_path, monkeypatch):
+    """A ref still throttled after the default retry exposes the UI transition."""
+    paper_text = (
+        "Some claim [1] remains temporarily unavailable.\n\n"
+        "References\n\n"
+        "[1] Some real paper in a throttled source.\n"
+    )
+    paper_file = tmp_path / "throttled.txt"
+    paper_file.write_text(paper_text)
+
+    import app as web_app
+    import citation_resolver
+    result = citation_resolver.ResolutionResult({"1": None}, throttled_refs=["1"])
+    monkeypatch.setattr(citation_resolver, "resolve_and_fetch_all", lambda *args, **kwargs: result)
+
+    default = web_app._run_verification(str(paper_file), "throttled.txt", ".txt", "auto")
+    patient = web_app._run_verification(
+        str(paper_file), "throttled.txt", ".txt", "auto", patient_wait=True
+    )
+
+    assert default["retry_offer"] is True
+    assert default["throttled_refs"] == ["1"]
+    assert patient["retry_offer"] is False
