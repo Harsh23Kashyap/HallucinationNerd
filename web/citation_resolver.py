@@ -15,6 +15,7 @@ import os
 import time
 import hashlib
 import requests
+import threading
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -43,8 +44,10 @@ def _rate_limit():
 
 
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
-_MAX_REQUEST_ATTEMPTS = 3
+_DEFAULT_REQUEST_ATTEMPTS = 2  # initial request + one backoff retry
+_PATIENT_REQUEST_ATTEMPTS = 11  # initial request + up to ten backoff retries
 _MAX_RETRY_DELAY_SECONDS = 5.0
+_request_policy = threading.local()
 
 
 def _retry_delay(response, attempt: int) -> float:
@@ -60,9 +63,15 @@ def _retry_delay(response, attempt: int) -> float:
 
 
 def _get_with_backoff(url: str, **kwargs):
-    """GET with bounded retries for rate limits, server errors, and timeouts."""
+    """GET with the active bounded retry policy.
+
+    Normal verification makes one backoff retry. A user who chooses "I can
+    wait" gets up to ten backoff retries. The policy is thread-local because
+    citation downloads run in a worker pool.
+    """
     response = None
-    for attempt in range(_MAX_REQUEST_ATTEMPTS):
+    attempts = getattr(_request_policy, "attempts", _DEFAULT_REQUEST_ATTEMPTS)
+    for attempt in range(attempts):
         _rate_limit()
         try:
             response = requests.get(url, **kwargs)
@@ -71,9 +80,12 @@ def _get_with_backoff(url: str, **kwargs):
 
         status = getattr(response, "status_code", None)
         if response is not None and status not in _RETRYABLE_STATUS_CODES:
+            _request_policy.throttled = False
             return response
-        if attempt + 1 < _MAX_REQUEST_ATTEMPTS:
+        if attempt + 1 < attempts:
             _time.sleep(_retry_delay(response, attempt))
+    if getattr(response, "status_code", None) == 429:
+        _request_policy.throttled = True
     return response
 
 
@@ -981,7 +993,22 @@ def backup_search(query: str, databases: list, custom_url_template: str = ""):
     return None, None
 
 
-def resolve_and_fetch_all(full_text: str, cited_refs: list) -> dict:
+class ResolutionResult(dict):
+    """Resolved-source mapping with refs still throttled after retries."""
+
+    def __init__(self, *args, throttled_refs=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.throttled_refs = throttled_refs or []
+
+
+def _fetch_with_policy(ref_info: dict, patient: bool):
+    _request_policy.attempts = _PATIENT_REQUEST_ATTEMPTS if patient else _DEFAULT_REQUEST_ATTEMPTS
+    _request_policy.throttled = False
+    content = fetch_source_content(ref_info)
+    return content, (not content and bool(getattr(_request_policy, "throttled", False)))
+
+
+def resolve_and_fetch_all(full_text: str, cited_refs: list, patient: bool = False) -> dict:
     """
     Main entry point: given full document text and a list of citation markers
     (e.g., ["1", "2"]), resolve each to actual content.
@@ -1028,18 +1055,21 @@ def resolve_and_fetch_all(full_text: str, cited_refs: list) -> dict:
             results[ref_key_str] = None
 
     # Parallel fetch (5 workers — fast but polite)
+    throttled_refs = []
     if to_fetch:
         with ThreadPoolExecutor(max_workers=5) as executor:
             future_to_ref = {}
             for ref_key_str, ref_info, cache_key in to_fetch:
-                future = executor.submit(fetch_source_content, ref_info)
+                future = executor.submit(_fetch_with_policy, ref_info, patient)
                 future_to_ref[future] = (ref_key_str, cache_key)
 
             for future in as_completed(future_to_ref):
                 ref_key_str, cache_key = future_to_ref[future]
                 try:
-                    content = future.result()
+                    content, throttled = future.result()
                     results[ref_key_str] = content
+                    if throttled:
+                        throttled_refs.append(ref_key_str)
                     # Cache ONLY successful fetches. Caching None poisons the
                     # cache: a single transient failure (e.g. arXiv rate-limit)
                     # would otherwise stick for the whole TTL and never retry.
@@ -1048,4 +1078,4 @@ def resolve_and_fetch_all(full_text: str, cited_refs: list) -> dict:
                 except Exception:
                     results[ref_key_str] = None
 
-    return results
+    return ResolutionResult(results, throttled_refs=throttled_refs)
