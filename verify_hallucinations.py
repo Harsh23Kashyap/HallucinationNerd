@@ -371,6 +371,7 @@ Based solely on your content, determine whether you actually support this claim.
 Verdict options:
 - SUPPORTED: Yes, I directly state this or it is logically inferable from what I say. This includes cases where my results/findings/experiments clearly demonstrate the claim even if I don't use those exact words.
 - PARTIALLY_SUPPORTED: My content covers the claim's core subject and supports at least part of its specific assertion, but the claim adds specifics or wording I don't use. Also use if my work implicitly supports the claim (e.g., I show large models still hallucinate, which implicitly supports "scaling doesn't fix hallucination").
+- UNVERIFIABLE also applies when the claim text is an extraction fragment (ablation-table bullet, method-variant shorthand, bibliography residue) that makes no standalone assertion about my content; a citation used as a method-attribution pointer is not a checkable claim. Never answer NOT_SUPPORTED for such fragments.
 - NOT_SUPPORTED: The claim's core subject or its specific assertion is absent from my content — I do not say this, even if I discuss related concepts in the same field. This was not attributed to me correctly.
 - CONTRADICTED: I explicitly say the opposite of this claim, or my methods/results are inconsistent with a specific assertion the claim attributes to me (e.g., the claim says I use repeated measurements when I describe only baseline data).
 - UNVERIFIABLE: My content is unavailable or too sparse to assess.
@@ -1086,6 +1087,49 @@ def search_pubmed(query: str, max_results: int = 3) -> list:
         return []
 
 
+
+def _is_non_assertion_fragment(text: str) -> bool:
+    """Detect extraction fragments that carry no checkable content assertion:
+    ablation-table bullets and method-variant shorthand (e.g. "S1+SS [1]")
+    where the citation is a method-attribution pointer, not a claim about the
+    source's content. Such fragments must abstain (UNVERIFIABLE), never accuse.
+
+    Conservative by design: requires a bullet/table marker AND method-designator
+    density, so ordinary claims that merely name methods ("BERT outperforms
+    GPT-2 on SQuAD [1]") still go to the judge.
+    """
+    if not text:
+        return False
+    t = re.sub(r"\[\d+(?:\s*,\s*\d+)*\]", " ", text)  # strip citation markers
+    if not re.search(r"[\u2022\u25aa\u25e6]|\t|^\s*[-*]\s", t, re.M):
+        return False  # no bullet/table marker: not this failure mode
+    tokens = t.split()
+    if not tokens:
+        return False
+    designators = [w for w in tokens
+                   if re.fullmatch(r"[A-Za-z]*\d+[A-Za-z0-9]*(?:[-+][A-Za-z0-9]+)*", w)
+                   or re.fullmatch(r"[A-Z][A-Za-z0-9]*[+/-][A-Za-z0-9]+", w)]
+    return len(designators) / len(tokens) >= 0.05
+
+
+def _fragment_abstention(question_id: str, claim_idx: int, claim_text: str, cited_refs: list) -> "ClaimVerification":
+    return ClaimVerification(
+        question_id=question_id,
+        claim_id=f"{question_id}-C{claim_idx}",
+        claim_text=claim_text,
+        cited_refs=list(cited_refs),
+        verdict="UNVERIFIABLE",
+        confidence=0.5,
+        evidence_quote="",
+        evidence_reference="",
+        evidence_span_start=-1,
+        evidence_span_end=-1,
+        reasoning=("Claim text is an extraction fragment (bullet/table shorthand, "
+                   "method-variant designators) with no standalone content assertion; "
+                   "the citation reads as a method-attribution pointer. Abstaining "
+                   "rather than judging - such fragments must never draw an accusation."),
+    )
+
 def verify_single_claim(
     claim: dict, articles: list, question: str, question_id: str, claim_idx: int,
     search_backup: bool = False, search_fn=None, n_votes: int = 1
@@ -1102,6 +1146,10 @@ def verify_single_claim(
     """
     cited_refs = claim.get("cited_refs", [])
     claim_text = claim.get("claim_text", "")
+
+    # Extraction fragments (ablation bullets, method shorthand) abstain; never accuse.
+    if _is_non_assertion_fragment(claim_text):
+        return _fragment_abstention(question_id, claim_idx, claim_text, cited_refs)
 
     if not cited_refs:
         # NEW: If search_backup enabled, try to find a reference for uncited claims
@@ -1343,6 +1391,10 @@ def verify_claim_per_ref(
     """
     cited_refs = claim.get("cited_refs", [])
     claim_text = claim.get("claim_text", "")
+
+    # Extraction fragments (ablation bullets, method shorthand) abstain; never accuse.
+    if _is_non_assertion_fragment(claim_text):
+        return _fragment_abstention(question_id, claim_idx, claim_text, cited_refs)
 
     if not cited_refs:
         # No citations: fall through to the same uncited-claim path as
