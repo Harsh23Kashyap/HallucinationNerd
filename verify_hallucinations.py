@@ -370,14 +370,16 @@ Based solely on your content, determine whether you actually support this claim.
 
 Verdict options:
 - SUPPORTED: Yes, I directly state this or it is logically inferable from what I say. This includes cases where my results/findings/experiments clearly demonstrate the claim even if I don't use those exact words.
-- PARTIALLY_SUPPORTED: I discuss this topic and the gist is correct, but the claim adds specifics or wording I don't use. Also use if my work implicitly supports the claim (e.g., I show large models still hallucinate, which implicitly supports "scaling doesn't fix hallucination").
-- NOT_SUPPORTED: I don't contain information relevant to this claim AT ALL — neither explicitly nor implicitly. This was not attributed to me correctly. The topic of the claim is unrelated to my content.
-- CONTRADICTED: I explicitly say the opposite of this claim.
+- PARTIALLY_SUPPORTED: My content covers the claim's core subject and supports at least part of its specific assertion, but the claim adds specifics or wording I don't use. Also use if my work implicitly supports the claim (e.g., I show large models still hallucinate, which implicitly supports "scaling doesn't fix hallucination").
+- NOT_SUPPORTED: The claim's core subject or its specific assertion is absent from my content — I do not say this, even if I discuss related concepts in the same field. This was not attributed to me correctly.
+- CONTRADICTED: I explicitly say the opposite of this claim, or my methods/results are inconsistent with a specific assertion the claim attributes to me (e.g., the claim says I use repeated measurements when I describe only baseline data).
 - UNVERIFIABLE: My content is unavailable or too sparse to assess.
 
-IMPORTANT: Before choosing NOT_SUPPORTED, verify that the claim's topic is truly absent from your content. If you discuss the same general topic (even from a different angle), you MUST choose PARTIALLY_SUPPORTED — not NOT_SUPPORTED. Reserve NOT_SUPPORTED strictly for cases where your paper is about a completely different subject area (e.g., claim is about "creatine safety" but your paper is about "computer vision"). If there is ANY topical connection between the claim and your content, choose PARTIALLY_SUPPORTED.
+IMPORTANT: Judge the claim's actual content, not its topic. Topical relatedness is not support: discussing related concepts in the same field does not make a claim PARTIALLY_SUPPORTED when its core subject or specific assertion is absent from your content — that is NOT_SUPPORTED. Before choosing NOT_SUPPORTED, check your whole content for the claim's core subject and specific assertion; choose NOT_SUPPORTED only when they are genuinely absent.
 
 HOWEVER: If the claim makes a COMPARATIVE statement (e.g., "X is superior/better/more effective than Y"), merely discussing X is NOT enough for PARTIALLY_SUPPORTED. The comparison itself must be present in your content. If you discuss X but never compare it to Y, the comparative claim is NOT_SUPPORTED.
+
+When the claim attributes a method, dataset usage, or analysis to me, verify what I actually did — not what I mention. A property of a dataset I describe (e.g., "participants undergo repeated evaluations"), a citation of someone else's method, and work I explicitly defer to the future do not count as things I did. If the claim says I used an approach that I mention only in passing, only as a dataset property, or only as future work, that specific assertion is NOT_SUPPORTED; if my analysis explicitly restricted itself in the opposite direction (e.g., "only baseline data were used"), the claim is CONTRADICTED.
 
 Return JSON:
 {

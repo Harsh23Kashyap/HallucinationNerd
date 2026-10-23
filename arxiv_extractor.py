@@ -177,9 +177,23 @@ def detect_citation_format(text):
     if f4:
         formats.append(("author_year_narrative", len(f4)))
 
+    # Format 7: Author et al. [Year] — narrative surname with bracketed year.
+    f7 = re.findall(r"[A-Z][\w'\-]+(?:\s+et\s+al\.?|\s+and\s+[A-Z][\w'\-]+)?\s*\[(?:19|20)\d{2}[a-z]?\]", text)
+    if f7:
+        formats.append(("author_year_bracket_narrative", len(f7)))
+
     # Format 2: [N] or [N, M] — counted even alongside author-year brackets
     # (mixed-format papers exist; every detected format is extracted).
-    f2 = re.findall(r'\[(\d+(?:[,\s\-–]\s*\d+)*)\]', text)
+    # A bracketed 4-digit year right after a surname ("Burges et al. [2005]")
+    # is an author-year citation, not a numbered one.
+    f2 = []
+    for _m in re.finditer(r'\[(\d+(?:[,\s\-–]\s*\d+)*)\]', text):
+        _g = _m.group(1).strip()
+        if re.fullmatch(r'(?:19|20)\d{2}[a-z]?', _g) and re.search(
+                r"[A-Z][\w'\-]+(?:\s+et\s+al\.?|\s+and\s+[A-Z][\w'\-]+)?\s*$",
+                text[:_m.start()]):
+            continue
+        f2.append(_g)
     if f2:
         formats.append(("numbered_bracket", len(f2)))
 
@@ -329,7 +343,10 @@ def _parse_numbered_bibliography(bibliography):
             entry = m.group(2).strip().replace('\n', ' ')
             if entry:
                 bib_entries[int(m.group(1))] = entry
-    return bib_entries
+    # Wrapped author-year bibliographies leave a line-start year ("2005.")
+    # that mimics a numeric label; real numbered bibliographies never reach
+    # 4-digit labels, so drop year-like keys.
+    return {k: v for k, v in bib_entries.items() if not (1900 <= k <= 2099)}
 
 
 # ─── Alphanumeric labels ────────────────────────────────────────────────────
@@ -384,6 +401,9 @@ def _extract_author_year(section_text, bibliography, fmt):
     elif fmt == "author_year_narrative":
         pattern = r'([A-Z][\w\'\-]+(?:\s*et al\.)?)\s*\((\d{4})[a-z]?\)'
         cite_pattern = r'[A-Z][\w\'\-]+(?:\s*et al\.)?\s*\(\d{4}[a-z]?\)'
+    elif fmt == "author_year_bracket_narrative":
+        pattern = r"([A-Z][\w'\-]+)(?:\s+et\s+al\.?|\s+and\s+[A-Z][\w'\-]+)?\s*\[((?:19|20)\d{2})[a-z]?\]"
+        cite_pattern = r"[A-Z][\w'\-]+(?:\s+et\s+al\.?|\s+and\s+[A-Z][\w'\-]+)?\s*\[(?:19|20)\d{2}[a-z]?\]"
     else:
         return []
 
