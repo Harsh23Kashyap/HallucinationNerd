@@ -178,6 +178,14 @@ CONFIG = {
     "max_retries": 3,
     "rate_limit_delay": 1.0,  # seconds between API calls
     "strictness": "lenient",  # "lenient" (precision) | "strict" (recall)
+    # Never-falsely-accuse gate: when a source had to be excerpted (content
+    # longer than the excerpt budget) and the judge returns NOT_SUPPORTED or
+    # CONTRADICTED, re-verify against the previously unseen regions of the
+    # source before accepting the accusation. The negative verdict is final
+    # only once the full source has been shown; otherwise the claim becomes
+    # UNVERIFIABLE, never "unsupported".
+    "full_source_recheck": True,
+    "max_recheck_rounds": 4,
 }
 
 # Strictness dial: which verdicts count as a detected hallucination.
@@ -417,8 +425,103 @@ def _find_relevant_spans(claim_text: str, content: str, max_chars: int = 4000, w
 
     This implements the HLD's "reference matching" — finding the most
     relevant spans in the reference for each claim.
+
+    The selection logic lives in _find_relevant_spans_with_coverage; this
+    wrapper keeps the original text-only return for existing callers.
     """
-    # Extract key terms from the claim
+    text, _covered = _find_relevant_spans_with_coverage(
+        claim_text, content, max_chars=max_chars, window=window,
+        top_chunks=top_chunks, anchor_chars=anchor_chars,
+    )
+    return text
+
+
+# ─── Negative-verdict full-source gate ──────────────────────────────────────
+#
+# Failure mode (Oct 14 smoke review): for sources longer than the excerpt
+# budget, the span selector shows the judge only keyword-overlap excerpts. A
+# supporting passage phrased in different vocabulary is never shown, and the
+# judge then returns NOT_SUPPORTED/CONTRADICTED for a claim the source
+# actually supports. The first priority of the verifier is to never falsely
+# accuse a supported claim of non-support, so a negative verdict reached on
+# excerpted content is provisional: the judge is re-shown the previously
+# unseen regions, and the accusation is accepted only once coverage is
+# complete. If the source cannot be fully covered within the round budget,
+# the claim is UNVERIFIABLE - never reported as unsupported.
+
+# Verdicts that accuse the claim and depend on where evidence sits in the
+# source. FABRICATED is deliberately excluded: it concerns the reference
+# itself, not the location of evidence within it.
+_EVIDENCE_SENSITIVE_NEGATIVES = {"NOT_SUPPORTED", "CONTRADICTED"}
+
+# Coverage at or above this fraction counts as "the judge saw the full
+# source" (the final window may be truncated by the excerpt budget).
+_FULL_COVERAGE_THRESHOLD = 0.99
+
+
+def _merge_ranges(ranges):
+    """Merge overlapping or adjacent (start, end) character ranges."""
+    merged = []
+    for s, e in sorted(ranges):
+        if merged and s <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e])
+    return [(s, e) for s, e in merged]
+
+
+def _coverage_fraction(content_len, covered):
+    """Fraction of [0, content_len) covered by the given ranges."""
+    if content_len <= 0:
+        return 1.0
+    return min(1.0, sum(e - s for s, e in _merge_ranges(covered)) / content_len)
+
+
+def _uncovered_ranges(content_len, covered):
+    """Return the gaps of [0, content_len) not present in covered."""
+    gaps = []
+    pos = 0
+    for s, e in _merge_ranges(covered):
+        if s > pos:
+            gaps.append((pos, s))
+        pos = max(pos, e)
+    if pos < content_len:
+        gaps.append((pos, content_len))
+    return gaps
+
+
+def _ranges_to_text(content, ranges, max_chars=4000):
+    """Build an excerpt from explicit character ranges, in document order.
+
+    Returns (text, ranges_actually_used). The last range may be truncated to
+    fit the character budget; the used ranges reflect that truncation so
+    coverage tracking stays exact.
+    """
+    parts = []
+    used = []
+    total = 0
+    for s, e in ranges:
+        remaining = max_chars - total
+        if remaining <= 0:
+            break
+        seg = content[s:e]
+        if len(seg) > remaining:
+            seg = seg[:remaining]
+        if not seg:
+            continue
+        parts.append(seg)
+        used.append((s, s + len(seg)))
+        total += len(seg) + 10  # separator allowance, mirrors _find_relevant_spans
+    return "\n...\n".join(parts), used
+
+
+def _find_relevant_spans_with_coverage(claim_text: str, content: str, max_chars: int = 4000, window: int = 1000, top_chunks: int = 12, anchor_chars: int = 500):
+    """Same excerpt selection as _find_relevant_spans, but also returns the
+    source character ranges the excerpt was drawn from, so callers can track
+    which parts of the document the judge actually saw.
+
+    Returns (excerpt_text, covered_ranges).
+    """
     stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'been', 'be', 'have', 'has',
                   'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might',
                   'shall', 'can', 'need', 'dare', 'ought', 'used', 'to', 'of', 'in', 'for', 'on',
@@ -429,16 +532,11 @@ def _find_relevant_spans(claim_text: str, content: str, max_chars: int = 4000, w
                      if len(w) > 3 and w.lower() not in stop_words)
 
     if not claim_words:
-        return content[:max_chars]
+        return content[:max_chars], [(0, min(len(content), max_chars))]
 
-    # For very short content (shorter than the window), no chunking is
-    # needed; return as-is.
     if len(content) <= window:
-        return content[:max_chars]
+        return content[:max_chars], [(0, min(len(content), max_chars))]
 
-    # Always include the first and last `anchor_chars` of the document so
-    # the LLM has intro/conclusion context even when key terms live in
-    # the middle.
     anchors = []
     head = content[:anchor_chars]
     tail = content[-anchor_chars:] if len(content) > anchor_chars else ""
@@ -447,22 +545,18 @@ def _find_relevant_spans(claim_text: str, content: str, max_chars: int = 4000, w
     if tail and tail != head:
         anchors.append((len(content) - anchor_chars, tail))
 
-    # Split content into overlapping windows and score each by keyword overlap
     chunks = []
-    step = max(50, window // 5)  # 5 windows per window-width for finer granularity
+    step = max(50, window // 5)
     for i in range(0, len(content) - window, step):
         chunk = content[i:i + window]
         chunk_words = set(w.lower().strip('.,;:()[]') for w in chunk.split())
         score = len(claim_words & chunk_words)
         chunks.append((score, i, chunk))
 
-    # Sort by relevance score, take top chunks
     chunks.sort(key=lambda x: -x[0])
 
-    # Combine: top chunks (deduped against anchors by position) + anchors.
-    # Then sort by position to maintain document order.
     selected_positions = set()
-    result_parts = []  # list of (position, text)
+    result_parts = []
 
     for score, pos, chunk in chunks[:top_chunks]:
         if score >= 2 and pos not in selected_positions:
@@ -476,13 +570,138 @@ def _find_relevant_spans(claim_text: str, content: str, max_chars: int = 4000, w
 
     result_parts.sort(key=lambda x: x[0])
     result = ""
+    covered = []
     for pos, chunk in result_parts:
         if len(result) + len(chunk) + 10 > max_chars:
             break
         if result:
             result += "\n...\n"
         result += chunk
-    return result
+        covered.append((pos, pos + len(chunk)))
+    return result, covered
+
+
+def _judge_claim_once(user_prompt, n_votes):
+    """Run one verification round: n_votes LLM passes with a majority verdict.
+
+    Returns (verdict, payload, all_votes).
+    """
+    passes = []
+    for _ in range(max(1, n_votes)):
+        raw = llm_call(
+            CITATION_VERIFICATION_PROMPT,
+            user_prompt,
+            response_format={"type": "json_object"},
+        )
+        try:
+            passes.append(json.loads(raw))
+        except json.JSONDecodeError:
+            passes.append({
+                "verdict": "UNVERIFIABLE",
+                "confidence": 0.0,
+                "evidence_quote": "",
+                "evidence_start_phrase": "",
+                "reasoning": "Failed to parse verification response",
+            })
+    votes = [p.get("verdict", "UNVERIFIABLE") for p in passes]
+    if n_votes > 1:
+        vote_counts = Counter(votes)
+        verdict = vote_counts.most_common(1)[0][0]
+        payload = next(p for p, v in zip(passes, votes) if v == verdict)
+    else:
+        payload = passes[0]
+        verdict = payload.get("verdict", "UNVERIFIABLE")
+    return verdict, payload, votes
+
+
+def _verdict_rank(verdict):
+    try:
+        return _PER_REF_AGGREGATION_ORDER.index(verdict)
+    except ValueError:
+        return -1
+
+
+def _verify_against_source(claim_text, question, ref_label, title, content, n_votes, max_chars=4000):
+    """Verify a claim against one source, gating negative verdicts on full
+    source coverage.
+
+    Round 1 shows the judge the keyword-selected excerpts (or the whole
+    source when it fits). If the verdict is NOT_SUPPORTED/CONTRADICTED and
+    parts of the source were never shown, further rounds show the unseen
+    regions. The strongest verdict across rounds wins. A negative verdict is
+    accepted only once coverage is complete; otherwise the claim becomes
+    UNVERIFIABLE with the unconfirmed negative recorded in the reasoning.
+
+    Returns a dict: verdict, payload (fields from the winning round),
+    all_votes, coverage, rounds, negative_confirmed.
+    """
+    header = f"[{ref_label}] {title}\n"
+
+    def _prompt_for(source_text):
+        return (
+            f"ORIGINAL QUESTION: {question}\n\n"
+            f"CLAIM ATTRIBUTED TO YOU: {claim_text}\n\n"
+            f"YOUR CONTENT:\n{header}{source_text}"
+        )
+
+    if len(content) <= max_chars:
+        verdict, payload, votes = _judge_claim_once(_prompt_for(content), n_votes)
+        return {
+            "verdict": verdict, "payload": payload, "all_votes": votes,
+            "coverage": 1.0, "rounds": 1,
+            "negative_confirmed": verdict in _EVIDENCE_SENSITIVE_NEGATIVES,
+        }
+
+    excerpt, covered = _find_relevant_spans_with_coverage(claim_text, content, max_chars=max_chars)
+    verdict, payload, votes = _judge_claim_once(_prompt_for(excerpt), n_votes)
+    rounds = [(verdict, payload, votes)]
+
+    gate_on = CONFIG.get("full_source_recheck", True)
+    max_rounds = max(1, int(CONFIG.get("max_recheck_rounds", 4)))
+    while (
+        gate_on
+        and _verdict_rank(rounds[-1][0]) == max(_verdict_rank(r[0]) for r in rounds)
+        and rounds[-1][0] in _EVIDENCE_SENSITIVE_NEGATIVES
+        and _coverage_fraction(len(content), covered) < _FULL_COVERAGE_THRESHOLD
+        and len(rounds) < max_rounds
+    ):
+        gaps = _uncovered_ranges(len(content), covered)
+        complement, used = _ranges_to_text(content, gaps, max_chars=max_chars)
+        if not complement.strip():
+            break
+        covered = _merge_ranges(covered + used)
+        v2, p2, votes2 = _judge_claim_once(_prompt_for(complement), n_votes)
+        rounds.append((v2, p2, votes2))
+
+    verdict, payload, votes = max(rounds, key=lambda r: _verdict_rank(r[0]))
+    coverage = _coverage_fraction(len(content), covered)
+    negative_confirmed = False
+    if verdict in _EVIDENCE_SENSITIVE_NEGATIVES:
+        if coverage >= _FULL_COVERAGE_THRESHOLD or not gate_on:
+            negative_confirmed = True
+        else:
+            # Never accuse on partial viewing: the supporting passage may sit
+            # in the region the judge never saw.
+            original = verdict
+            payload = {
+                "verdict": "UNVERIFIABLE",
+                "confidence": payload.get("confidence", 0.0),
+                "evidence_quote": "",
+                "evidence_start_phrase": "",
+                "reasoning": (
+                    f"Provisional {original} after {len(rounds)} round(s) covered "
+                    f"{coverage:.0%} of the source; supporting passage may lie "
+                    "outside the reviewed excerpts. Marked UNVERIFIABLE instead "
+                    f"of accusing the claim. Original reasoning: {payload.get('reasoning', '')}"
+                ),
+            }
+            verdict = "UNVERIFIABLE"
+            votes = None
+    return {
+        "verdict": verdict, "payload": payload, "all_votes": votes,
+        "coverage": coverage, "rounds": len(rounds),
+        "negative_confirmed": negative_confirmed,
+    }
 
 
 def _search_backup_reference(claim_text: str, question: str, question_id: str, claim_idx: int, search_fn) -> 'ClaimVerification':
@@ -731,22 +950,27 @@ def verify_single_claim(
             reasoning="No citation provided for this claim",
         )
 
-    # Gather content from cited articles — find most relevant spans
+    # Gather content from cited articles — find most relevant spans.
+    # Track per-ref source content and which character ranges were shown, so
+    # a negative verdict can be rechecked against the unseen regions
+    # (never-falsely-accuse gate).
     source_texts = []
+    long_refs = []  # mutable [ref_num, title, content, covered_ranges]
     for ref_num in cited_refs:
         idx = ref_num - 1  # 0-indexed
         if 0 <= idx < len(articles):
             art = articles[idx]
             content = art.get("content") or art.get("abstract") or art.get("summary") or ""
             title = art.get("title", f"Article {ref_num}")
-            
+
             # If content is short enough, use it all
             if len(content) <= 4000:
                 source_texts.append(f"[{ref_num}] {title}\n{content}")
             else:
                 # Find the most relevant spans for this claim
-                relevant_chunk = _find_relevant_spans(claim_text, content)
+                relevant_chunk, covered = _find_relevant_spans_with_coverage(claim_text, content)
                 source_texts.append(f"[{ref_num}] {title}\n{relevant_chunk}")
+                long_refs.append([ref_num, title, content, covered])
         else:
             source_texts.append(f"[{ref_num}] (article not found in retrieved set)")
 
@@ -758,37 +982,66 @@ def verify_single_claim(
         f"YOUR CONTENT:\n{source_block}"
     )
 
-    # Run n_votes passes and collect parsed results
-    passes = []
-    for _ in range(max(1, n_votes)):
-        raw = llm_call(
-            CITATION_VERIFICATION_PROMPT,
-            user_prompt,
-            response_format={"type": "json_object"},
+    result_verdict, result, all_votes = _judge_claim_once(user_prompt, n_votes)
+
+    # Never-falsely-accuse gate: a negative verdict reached while part of a
+    # cited source was never shown is provisional. Re-show the unseen regions
+    # (all long refs' gaps combined per round) and accept the accusation only
+    # when every long source has been fully covered. Otherwise the claim is
+    # UNVERIFIABLE - never reported as unsupported.
+    gate_on = CONFIG.get("full_source_recheck", True)
+    max_rounds = max(1, int(CONFIG.get("max_recheck_rounds", 4)))
+    rounds = 1
+    while (
+        gate_on
+        and result_verdict in _EVIDENCE_SENSITIVE_NEGATIVES
+        and long_refs
+        and any(_coverage_fraction(len(lr[2]), lr[3]) < _FULL_COVERAGE_THRESHOLD for lr in long_refs)
+        and rounds < max_rounds
+    ):
+        complement_texts = []
+        for lr in long_refs:
+            ref_num, title, content, covered = lr
+            if _coverage_fraction(len(content), covered) >= _FULL_COVERAGE_THRESHOLD:
+                continue
+            complement, used = _ranges_to_text(content, _uncovered_ranges(len(content), covered))
+            if not complement.strip():
+                continue
+            lr[3] = _merge_ranges(covered + used)
+            complement_texts.append(f"[{ref_num}] {title}\n{complement}")
+        if not complement_texts:
+            break
+        complement_block = "\n\n---\n\n".join(complement_texts)
+        recheck_prompt = (
+            f"ORIGINAL QUESTION: {question}\n\n"
+            f"CLAIM ATTRIBUTED TO YOU: {claim_text}\n\n"
+            f"YOUR CONTENT:\n{complement_block}"
         )
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            parsed = {
+        v2, p2, votes2 = _judge_claim_once(recheck_prompt, n_votes)
+        rounds += 1
+        if _verdict_rank(v2) > _verdict_rank(result_verdict):
+            result_verdict, result, all_votes = v2, p2, votes2
+
+    if result_verdict in _EVIDENCE_SENSITIVE_NEGATIVES and gate_on and long_refs:
+        incomplete = [lr for lr in long_refs
+                      if _coverage_fraction(len(lr[2]), lr[3]) < _FULL_COVERAGE_THRESHOLD]
+        if incomplete:
+            # Never accuse on partial viewing: supporting evidence may sit in
+            # the region the judge never saw.
+            result = {
                 "verdict": "UNVERIFIABLE",
-                "confidence": 0.0,
+                "confidence": result.get("confidence", 0.0),
                 "evidence_quote": "",
                 "evidence_start_phrase": "",
-                "reasoning": "Failed to parse verification response",
+                "reasoning": (
+                    f"Provisional {result_verdict} after {rounds} round(s); "
+                    f"{len(incomplete)} cited source(s) not fully reviewed "
+                    "(supporting passage may lie outside the reviewed excerpts). "
+                    "Marked UNVERIFIABLE instead of accusing the claim. "
+                    f"Original reasoning: {result.get('reasoning', '')}"
+                ),
             }
-        passes.append(parsed)
-
-    all_votes = [p.get("verdict", "UNVERIFIABLE") for p in passes]
-
-    if n_votes > 1:
-        # Majority vote on verdict; break ties by keeping first-seen order
-        vote_counts = Counter(all_votes)
-        majority_verdict = vote_counts.most_common(1)[0][0]
-        # Use the fields (confidence/evidence/reasoning) from the first pass
-        # whose verdict matches the majority, so the report stays internally consistent
-        result = next(p for p, v in zip(passes, all_votes) if v == majority_verdict)
-    else:
-        result = passes[0]
+            all_votes = None
 
     # Compute span offset: find evidence_quote in the source content
     evidence_quote = result.get("evidence_quote", "")
@@ -944,13 +1197,6 @@ def verify_claim_per_ref(
             })
             continue
 
-        # Build a single-ref source block and call the LLM
-        if len(content) <= 4000:
-            relevant = content
-        else:
-            relevant = _find_relevant_spans(claim_text, content)
-        source_block = f"[{ref_num}] {title}\n{relevant}"
-
         # H1: NLI pre-filter (optional, default off). If enabled and the
         # NLI model is confident (>= SHORT_CIRCUIT_*_THRESHOLD), skip the
         # LLM call for this ref entirely. Saves cost and latency on
@@ -958,6 +1204,11 @@ def verify_claim_per_ref(
         nli_short_circuited = False
         try:
             import hve_nli
+            if len(content) <= 4000:
+                relevant = content
+            else:
+                relevant = _find_relevant_spans(claim_text, content)
+            source_block = f"[{ref_num}] {title}\n{relevant}"
             short = hve_nli.maybe_short_circuit(claim_text, source_block)
             if short is not None:
                 verdict_label, conf, _eq = short
@@ -973,51 +1224,37 @@ def verify_claim_per_ref(
         except ImportError:
             pass  # hve_nli not on path; skip
 
-        user_prompt = (
-            f"ORIGINAL QUESTION: {question}\n\n"
-            f"CLAIM ATTRIBUTED TO YOU: {claim_text}\n\n"
-            f"YOUR CONTENT:\n{source_block}"
-        ) if not nli_short_circuited else ""
-
-        if nli_short_circuited:
-            # Skip LLM call entirely; ref_verdict and ref_payload already set
-            passes = [ref_payload]
+        if not nli_short_circuited:
+            # Verify against this ref with the never-falsely-accuse gate:
+            # negative verdicts on excerpted sources are rechecked against
+            # the previously unseen regions before being accepted.
+            outcome = _verify_against_source(
+                claim_text, question, ref_num, title, content, n_votes
+            )
+            ref_verdict = outcome["verdict"]
+            ref_payload = outcome["payload"]
+            ref_coverage = outcome["coverage"]
+            ref_rounds = outcome["rounds"]
+            ref_negative_confirmed = outcome["negative_confirmed"]
         else:
-            # n_votes: majority over the votes for this single ref
-            passes = []
-            for _ in range(max(1, n_votes)):
-                raw = llm_call(
-                    CITATION_VERIFICATION_PROMPT,
-                    user_prompt,
-                    response_format={"type": "json_object"},
-                )
-                try:
-                    passes.append(json.loads(raw))
-                except json.JSONDecodeError:
-                    passes.append({
-                        "verdict": "UNVERIFIABLE",
-                        "confidence": 0.0,
-                        "evidence_quote": "",
-                        "evidence_start_phrase": "",
-                        "reasoning": "Failed to parse verification response",
-                    })
-
-            if n_votes > 1:
-                vote_counts = Counter(p.get("verdict", "UNVERIFIABLE") for p in passes)
-                ref_verdict = vote_counts.most_common(1)[0][0]
-                ref_payload = next(p for p, v in zip(passes, [pp.get("verdict", "UNVERIFIABLE") for pp in passes]) if v == ref_verdict)
-            else:
-                ref_verdict = passes[0].get("verdict", "UNVERIFIABLE")
-                ref_payload = passes[0]
+            ref_coverage = None
+            ref_rounds = 0
+            ref_negative_confirmed = None
 
         ref_confidence = float(ref_payload.get("confidence", 0.0))
-        per_ref_verdicts.append({
+        entry = {
             "ref_num": ref_num,
             "verdict": ref_verdict,
             "confidence": ref_confidence,
             "evidence_quote": ref_payload.get("evidence_quote", ""),
             "reasoning": ref_payload.get("reasoning", ""),
-        })
+        }
+        if ref_coverage is not None:
+            entry["coverage"] = round(ref_coverage, 4)
+            entry["recheck_rounds"] = ref_rounds
+            if ref_negative_confirmed:
+                entry["negative_confirmed_full_source"] = True
+        per_ref_verdicts.append(entry)
 
         # Aggregate: take the strongest verdict
         rank = _PER_REF_AGGREGATION_ORDER.index(ref_verdict) if ref_verdict in _PER_REF_AGGREGATION_ORDER else -1
