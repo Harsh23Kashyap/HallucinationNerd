@@ -114,12 +114,29 @@ def test_gate_disabled_restores_old_behavior(mock_openai):
 
 def test_single_claim_path_gate(mock_openai):
     """The benchmark path (verify_single_claim) applies the same gate."""
-    _queue(mock_openai, ["NOT_SUPPORTED", "SUPPORTED"])
+    _queue_with_quote(mock_openai, ["NOT_SUPPORTED", "SUPPORTED"],
+                      "The architecture attends to every position jointly and in parallel.")
     claim = {"claim_text": "Transformers [1] use self-attention.", "cited_refs": [1]}
     articles = [{"content": _long_source(), "title": "Paper"}]
     result = vh.verify_single_claim(claim, articles, question="Q", question_id="Q1", claim_idx=1)
     assert result.verdict == "SUPPORTED"
     assert mock_openai.call_count == 2
+
+
+def _queue_with_quote(mock_openai, verdicts, quote):
+    """Force verdicts, attaching a real source quote to SUPPORTED rounds."""
+    q = iter([
+        {"verdict": v, "confidence": 0.9,
+         "evidence_quote": quote if v == "SUPPORTED" else "",
+         "evidence_start_phrase": " ".join(quote.split()[:5]) if v == "SUPPORTED" else "",
+         "reasoning": f"forced {v}"}
+        for v in verdicts
+    ])
+    real_create = mock_openai.create
+    def queue_create(*args, **kwargs):
+        mock_openai.next_verdict = next(q)
+        return real_create(*args, **kwargs)
+    mock_openai.create = queue_create
 
 
 def test_single_claim_path_negative_confirmed_full_coverage(mock_openai):

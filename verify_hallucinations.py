@@ -965,6 +965,7 @@ def verify_single_claim(
     # (never-falsely-accuse gate).
     source_texts = []
     long_refs = []  # mutable [ref_num, title, content, covered_ranges]
+    shown_by_ref = {}  # ref_num -> every chunk of that ref the judge is shown
     for ref_num in cited_refs:
         idx = ref_num - 1  # 0-indexed
         if 0 <= idx < len(articles):
@@ -974,14 +975,18 @@ def verify_single_claim(
 
             # If content is short enough, use it all
             if len(content) <= 4000:
-                source_texts.append(f"[{ref_num}] {title}\n{content}")
+                shown = f"[{ref_num}] {title}\n{content}"
+                source_texts.append(shown)
             else:
                 # Find the most relevant spans for this claim
                 relevant_chunk, covered = _find_relevant_spans_with_coverage(claim_text, content)
-                source_texts.append(f"[{ref_num}] {title}\n{relevant_chunk}")
+                shown = f"[{ref_num}] {title}\n{relevant_chunk}"
+                source_texts.append(shown)
                 long_refs.append([ref_num, title, content, covered])
         else:
-            source_texts.append(f"[{ref_num}] (article not found in retrieved set)")
+            shown = f"[{ref_num}] (article not found in retrieved set)"
+            source_texts.append(shown)
+        shown_by_ref.setdefault(ref_num, []).append(shown)
 
     source_block = "\n\n---\n\n".join(source_texts)
 
@@ -1019,7 +1024,9 @@ def verify_single_claim(
             if not complement.strip():
                 continue
             lr[3] = _merge_ranges(covered + used)
-            complement_texts.append(f"[{ref_num}] {title}\n{complement}")
+            shown_comp = f"[{ref_num}] {title}\n{complement}"
+            complement_texts.append(shown_comp)
+            shown_by_ref.setdefault(ref_num, []).append(shown_comp)
         if not complement_texts:
             break
         complement_block = "\n\n---\n\n".join(complement_texts)
@@ -1052,6 +1059,44 @@ def verify_single_claim(
                     f"Original reasoning: {result.get('reasoning', '')}"
                 ),
             }
+            all_votes = None
+
+    # Never-falsely-pass grounding check (mirror of the accusation gate).
+    # SUPPORTED / PARTIALLY_SUPPORTED / CONTRADICTED must carry an evidence
+    # quote, and the quote must appear in the chunks of THAT cited ref the
+    # judge was actually shown - otherwise the verdict rested on unseen
+    # content (e.g. parametric knowledge of a well-known dataset) and is
+    # downgraded to UNVERIFIABLE. NOT_SUPPORTED asserts absence, so it needs
+    # no quote (it is already coverage-gated), but if it supplies one the
+    # quote must still be shown. A matching quote is a necessary condition,
+    # never proof of entailment by itself.
+    if result_verdict != "UNVERIFIABLE":
+        eq_check = (result.get("evidence_quote") or "").strip()
+        needs_quote = result_verdict in ("SUPPORTED", "PARTIALLY_SUPPORTED", "CONTRADICTED")
+        quote_missing = needs_quote and not eq_check
+        quote_unshown = False
+        if eq_check:
+            evidence_ref = cited_refs[0] if cited_refs else None
+            shown_norm = re.sub(
+                r"\s+", " ", "\n".join(shown_by_ref.get(evidence_ref, []))).lower()
+            quote_norm = re.sub(r"\s+", " ", eq_check[:80]).lower()
+            quote_unshown = bool(quote_norm) and quote_norm not in shown_norm
+        if quote_missing or quote_unshown:
+            why = ("the verdict carried no evidence quote" if quote_missing
+                   else "the evidence quote was not found in the excerpts of the cited source shown to the judge")
+            result = {
+                "verdict": "UNVERIFIABLE",
+                "confidence": result.get("confidence", 0.0),
+                "evidence_quote": "",
+                "evidence_start_phrase": "",
+                "reasoning": (
+                    f"Grounding check failed ({why}); the {result_verdict} "
+                    "verdict is not grounded in the reviewed text of the cited "
+                    "source. Marked UNVERIFIABLE. "
+                    f"Original reasoning: {result.get('reasoning', '')}"
+                ),
+            }
+            result_verdict = "UNVERIFIABLE"
             all_votes = None
 
     # Compute span offset: find evidence_quote in the source content
