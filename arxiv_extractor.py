@@ -45,6 +45,35 @@ _ABBREV_RE = re.compile(
 _ABBR_PH = "\x00ABBR\x00"
 
 
+
+_ARXIV_ID_RE = re.compile(r'(\d{4}\.\d{4,5})')
+_ARXIV_EXPLICIT_RE = re.compile(r'(?:arXiv:|arxiv\.org/(?:abs|pdf)/)\s*(\d{4}\.\d{4,5})', re.I)
+
+def _valid_arxiv_id(candidate):
+    """YYMM.NNNNN arXiv id sanity: month 01-12 (rejects DOI suffixes, years)."""
+    if not candidate:
+        return False
+    ym = candidate.split(".", 1)[0]
+    if len(ym) != 4 or not ym.isdigit():
+        return False
+    month = int(ym[2:])
+    return 1 <= month <= 12
+
+def _arxiv_id_from_entry(entry):
+    """First arXiv id in a bibliography entry; explicit arXiv markers win.
+    Bare numbers must pass the month check and must not be glued to a
+    longer token (rejects DOI suffixes like 10.1109/MSR.2012.12345)."""
+    explicit = _ARXIV_EXPLICIT_RE.search(entry)
+    if explicit and _valid_arxiv_id(explicit.group(1)):
+        return explicit.group(1)
+    for m in _ARXIV_ID_RE.finditer(entry):
+        if not _valid_arxiv_id(m.group(1)):
+            continue
+        if m.start() > 0 and entry[m.start() - 1] in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./-":
+            continue
+        return m.group(1)
+    return None
+
 def _protect_abbrev_periods(text):
     return _ABBREV_RE.sub(lambda m: m.group(0)[:-1] + _ABBR_PH, text)
 
@@ -272,11 +301,11 @@ def _extract_numbered(section_text, bibliography, fmt):
 
     results = []
     for num in sorted(best_clause):
-        arxiv_id = re.search(r'(\d{4}\.\d{4,5})', bib_entries[num])
+        arxiv_id = _arxiv_id_from_entry(bib_entries[num])
         if arxiv_id:
             results.append({
                 "clause": best_clause[num],
-                "arxiv_id": arxiv_id.group(1),
+                "arxiv_id": arxiv_id,
                 "cite_num": num,
                 "bib_entry": bib_entries[num][:100],
                 "format": "numbered",
@@ -330,11 +359,11 @@ def _extract_alpha(section_text, bibliography):
 
     results = []
     for key in sorted(best_clause):
-        arxiv_id = re.search(r'(\d{4}\.\d{4,5})', bib_entries[key])
+        arxiv_id = _arxiv_id_from_entry(bib_entries[key])
         if arxiv_id:
             results.append({
                 "clause": best_clause[key],
-                "arxiv_id": arxiv_id.group(1),
+                "arxiv_id": arxiv_id,
                 "cite_key": key,
                 "bib_entry": bib_entries[key][:100],
                 "format": "alpha",
@@ -454,12 +483,12 @@ def _find_in_bibliography(author, year, bib_entries, claim_text=""):
             continue
 
         # Has arXiv ID?
-        match = re.search(r'(\d{4}\.\d{4,5})', entry)
-        if not match:
+        arxiv_id = _arxiv_id_from_entry(entry)
+        if not arxiv_id:
             continue
 
         candidates.append({
-            "arxiv_id": match.group(1),
+            "arxiv_id": arxiv_id,
             "entry": entry,
         })
 

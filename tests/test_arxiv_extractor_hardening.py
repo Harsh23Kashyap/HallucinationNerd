@@ -155,3 +155,34 @@ def test_pdf_section_not_confused_by_prose_mention(tmp_path):
     nums = {p.get("cite_num") for p in pairs}
     assert 5 in nums
     assert 9 not in nums  # citation from the prose mention, not the section
+
+
+def test_arxiv_id_helper_rejects_doi_suffixes_and_years():
+    # DOI tails and bare years are not arXiv ids.
+    assert ax._arxiv_id_from_entry("Barke, Holmes. 2023. Grounded Copilot. doi 10.1145/3544548.3581387") is None
+    assert ax._arxiv_id_from_entry("Maldonado. 2017. Using NLP. doi 10.1109/MSR.2017.26542") is None
+    assert ax._arxiv_id_from_entry("Jones. doi 10.1109/TPAMI.2012.12345 extra") is None
+    assert ax._arxiv_id_from_entry("Roe. 2020. No identifier here at all") is None
+
+
+def test_arxiv_id_helper_accepts_explicit_and_bare_ids():
+    assert ax._arxiv_id_from_entry("Smith et al. arXiv:2305.14314 [cs.CL]") == "2305.14314"
+    assert ax._arxiv_id_from_entry("Preprint at https://arxiv.org/abs/2202.07209") == "2202.07209"
+    assert ax._arxiv_id_from_entry("Jones. 2021. Some result. arXiv 2106.12345") == "2106.12345"
+
+
+def test_pdf_bib_doi_not_misread_as_arxiv(tmp_path):
+    body = (
+        "2. Related Work\n"
+        "Copilot-style tools have been studied extensively [4] in the past.\n"
+        "3. Method\n"
+        "Method text.\n"
+        "References\n"
+        "[4] Barke, Holmes, Bird. 2023. Grounded Copilot. doi 10.1145/3544548.3581387\n"
+        "[5] Devlin et al. BERT. arXiv:1810.04805\n"
+    )
+    pdf = _make_pdf(tmp_path, [body])
+    pairs = ax.extract_citations_from_pdf(pdf)
+    ids = {p.get("arxiv_id") for p in pairs}
+    assert "1810.04805" not in ids  # [5] never cited in the section
+    assert all(i is None or i[:2] != "85" for i in ids)
