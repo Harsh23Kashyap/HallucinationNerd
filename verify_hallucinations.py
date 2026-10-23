@@ -523,6 +523,75 @@ def _ranges_to_text(content, ranges, max_chars=4000):
     return "\n...\n".join(parts), used
 
 
+# --- Qualifier-aware span selection -----------------------------------------
+#
+# Failure mode (SCOPE-PD, Oct 23 live run): the excerpt carried the matched
+# dataset-description sentence ("each participant undergoes repeated
+# evaluations ...") but not the restricting sentence beside it ("only the
+# baseline (i.e., first-visit) data were used"). The judge passed a claim the
+# shown evidence seemed to support while the decisive qualifier sat just
+# outside the shown window. Restriction/contrast sentences score low on claim
+# keyword overlap, so top-k chunk selection misses them even when they sit
+# next to a matched anchor. After selection, scan a small neighborhood around
+# the selected chunks for sentences carrying restriction/contrast markers and
+# include them, so the judge sees the qualifier together with the anchor.
+
+_QUALIFIER_RE = re.compile(
+    r"\b(only|solely|restricted|restricts|restriction|limited to|rather than|"
+    r"instead of|except|excluding|excluded|excludes|baseline|first[- ]visit|"
+    r"subset|however|in contrast|by contrast|whereas|although|despite|"
+    r"nevertheless|conversely)\b",
+    re.IGNORECASE,
+)
+
+_QUALIFIER_NEIGHBORHOOD = 600   # chars each side of a selected chunk
+_QUALIFIER_BUDGET = 900         # max chars of qualifier sentences added
+
+# Same abbreviation list as the claim extractor, so "i.e.," / "et al." do not
+# split qualifier sentences mid-fragment.
+_QUAL_ABBREVS = (
+    "et al", "Fig", "Eq", "i.e", "e.g", "cf", "vs", "approx", "Dr", "Mr",
+    "Mrs", "Ms", "Prof", "St", "No", "Inc", "Ltd", "Co", "Corp", "al",
+    "pp", "Vol",
+)
+
+
+def _iter_sentence_offsets(text, base=0):
+    """Yield (start, end) char offsets of rough sentences in text. A period
+    closing a known abbreviation ("et al.", "i.e.") is not a boundary, so
+    offsets stay true to the original text (no placeholder rewriting)."""
+    start = 0
+    for m in re.finditer(r"(?<=[.!?])\s+", text):
+        head = text[max(0, m.start() - 12):m.start()].rstrip(".!?").lower()
+        if any(head.endswith(abbr.lower()) for abbr in _QUAL_ABBREVS):
+            continue
+        yield base + start, base + m.start()
+        start = m.end()
+    if start < len(text):
+        yield base + start, base + len(text)
+
+
+def _find_qualifier_spans(content, selected_ranges):
+    """Offsets of restriction/contrast sentences sitting just outside the
+    selected chunks, within a small neighborhood of them."""
+    if not selected_ranges:
+        return []
+    merged = _merge_ranges(selected_ranges)
+    spans = []
+    for s, e in merged:
+        lo = max(0, s - _QUALIFIER_NEIGHBORHOOD)
+        hi = min(len(content), e + _QUALIFIER_NEIGHBORHOOD)
+        for ss, se in _iter_sentence_offsets(content[lo:hi], base=lo):
+            sent = content[ss:se]
+            if not _QUALIFIER_RE.search(sent):
+                continue
+            mid = (ss + se) // 2
+            if any(cs <= mid < ce for cs, ce in merged):
+                continue  # already inside a selected chunk
+            spans.append((ss, se))
+    return _merge_ranges(spans) if spans else []
+
+
 def _find_relevant_spans_with_coverage(claim_text: str, content: str, max_chars: int = 4000, window: int = 1000, top_chunks: int = 12, anchor_chars: int = 500):
     """Same excerpt selection as _find_relevant_spans, but also returns the
     source character ranges the excerpt was drawn from, so callers can track
@@ -576,11 +645,42 @@ def _find_relevant_spans_with_coverage(claim_text: str, content: str, max_chars:
             result_parts.append((pos, anchor))
             selected_positions.add(pos)
 
+    # Merge overlapping/adjacent selected ranges into whole regions before
+    # the budget runs. Chunks overlap heavily (step < window), so the naive
+    # per-chunk budget kept the first chunk of a region and dropped the rest,
+    # trimming decisive text (the SCOPE-PD restricting sentence sat in the
+    # dropped overlap tail of the selected top chunks).
+    merged = []
+    for pos, chunk in sorted(result_parts, key=lambda x: x[0]):
+        s, e = pos, pos + len(chunk)
+        if merged and s <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e])
+    result_parts = [(s, content[s:e]) for s, e in merged]
+
+    qualifier_spans = _find_qualifier_spans(content, [(s, e) for s, e in merged])
+    q_budget = _QUALIFIER_BUDGET
+    for qs, qe in qualifier_spans:
+        seg = content[qs:qe]
+        if len(seg) > q_budget:
+            continue
+        q_budget -= len(seg)
+        result_parts.append((qs, seg))
+
     result_parts.sort(key=lambda x: x[0])
     result = ""
     covered = []
     for pos, chunk in result_parts:
         if len(result) + len(chunk) + 10 > max_chars:
+            # Keep the region's prefix up to the remaining budget rather than
+            # dropping it whole; covered reflects the truncation exactly.
+            remaining = max_chars - len(result) - (10 if result else 0)
+            if remaining > 0:
+                if result:
+                    result += "\n...\n"
+                result += chunk[:remaining]
+                covered.append((pos, pos + min(len(chunk), remaining)))
             break
         if result:
             result += "\n...\n"
