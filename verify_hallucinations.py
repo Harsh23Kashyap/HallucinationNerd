@@ -186,6 +186,12 @@ CONFIG = {
     # UNVERIFIABLE, never "unsupported".
     "full_source_recheck": True,
     "max_recheck_rounds": 4,
+    # Complement rounds use a larger excerpt budget than round 1 so that
+    # full coverage of a typical paper (30-45k chars) is reachable within
+    # the round budget: 4k (round 1) + 3 x 12k = 40k. Papers longer than
+    # the reachable coverage are marked UNVERIFIABLE on negative verdicts
+    # rather than accused.
+    "recheck_max_chars": 12000,
 }
 
 # Strictness dial: which verdicts count as a detected hallucination.
@@ -666,7 +672,8 @@ def _verify_against_source(claim_text, question, ref_label, title, content, n_vo
         and len(rounds) < max_rounds
     ):
         gaps = _uncovered_ranges(len(content), covered)
-        complement, used = _ranges_to_text(content, gaps, max_chars=max_chars)
+        complement, used = _ranges_to_text(
+            content, gaps, max_chars=int(CONFIG.get("recheck_max_chars", 12000)))
         if not complement.strip():
             break
         covered = _merge_ranges(covered + used)
@@ -1004,7 +1011,9 @@ def verify_single_claim(
             ref_num, title, content, covered = lr
             if _coverage_fraction(len(content), covered) >= _FULL_COVERAGE_THRESHOLD:
                 continue
-            complement, used = _ranges_to_text(content, _uncovered_ranges(len(content), covered))
+            complement, used = _ranges_to_text(
+                content, _uncovered_ranges(len(content), covered),
+                max_chars=int(CONFIG.get("recheck_max_chars", 12000)))
             if not complement.strip():
                 continue
             lr[3] = _merge_ranges(covered + used)
@@ -1397,11 +1406,21 @@ def verify_citations_for_question(entry: dict, search_backup: bool = False, n_vo
         return []
 
     if single_claim:
+        raw_refs = extract_cited_refs(synopsis)
+        # The pre-paired benchmark keeps the source paper's original citation
+        # markers in the extracted sentence, but only the mapped ref resolves
+        # against retrieved_articles. Unresolvable refs are extraction
+        # artifacts here (not fabrication signal - that detection lives in
+        # the website path), so keep them out of the judge's prompt.
+        resolvable = [n for n in raw_refs if 0 <= n - 1 < len(articles)]
+        dropped = [n for n in raw_refs if not (0 <= n - 1 < len(articles))]
         claims = [{
             "claim_text": synopsis,
-            "cited_refs": extract_cited_refs(synopsis),
+            "cited_refs": resolvable,
+            "dropped_unresolvable_refs": dropped,
         }]
-        print(f"  [{question_id}] Single-claim mode: 1 claim, cited_refs={claims[0]['cited_refs']}")
+        print(f"  [{question_id}] Single-claim mode: 1 claim, cited_refs={resolvable}"
+              + (f" (dropped {len(dropped)} unresolvable)" if dropped else ""))
     else:
         print(f"  [{question_id}] Decomposing claims...")
         claims = decompose_claims(synopsis)
