@@ -629,6 +629,58 @@ def _verdict_rank(verdict):
         return -1
 
 
+def _quote_in_shown(quote: str, shown_norm: str) -> bool:
+    """True when the full evidence quote appears in the shown text.
+
+    Whitespace-normalized on both sides. A quote of the form "start ... end"
+    (ellipsis skipping source text) is checked span by span; every span must
+    be substantive (>=10 chars) and present. A prefix-valid quote with a
+    fabricated or contradictory suffix fails the full-quote match and has no
+    valid ellipsis split, so it does not ground.
+    """
+    q = re.sub(r"\s+", " ", (quote or "")).strip().lower()
+    if not q:
+        return False
+    if q in shown_norm:
+        return True
+    parts = [p.strip() for p in re.split(r"\.\.\.|\u2026", q) if p.strip()]
+    if len(parts) >= 2 and all(len(p) >= 10 for p in parts):
+        return all(p in shown_norm for p in parts)
+    return False
+
+
+def _grounding_failure(verdict: str, payload: dict, shown_norm: str):
+    """Return a failure reason when the verdict is not grounded in shown
+    evidence, else None. A shown quote is necessary, never proof of
+    entailment. NOT_SUPPORTED asserts absence, so it needs no quote (it is
+    coverage-gated), but a quote it supplies must still be shown."""
+    if verdict == "UNVERIFIABLE":
+        return None
+    quote = (payload.get("evidence_quote") or "").strip()
+    if verdict in ("SUPPORTED", "PARTIALLY_SUPPORTED", "CONTRADICTED") and not quote:
+        return "the verdict carried no evidence quote"
+    if quote and not _quote_in_shown(quote, shown_norm):
+        return ("the evidence quote was not found in the excerpts of the "
+                "cited source shown to the judge")
+    return None
+
+
+def _ungrounded_result(verdict: str, payload: dict, reason: str):
+    """Downgrade an ungrounded verdict to UNVERIFIABLE."""
+    new_payload = {
+        "verdict": "UNVERIFIABLE",
+        "confidence": payload.get("confidence", 0.0),
+        "evidence_quote": "",
+        "evidence_start_phrase": "",
+        "reasoning": (
+            f"Grounding check failed ({reason}); the {verdict} verdict is not "
+            "grounded in the reviewed text of the cited source. Marked "
+            f"UNVERIFIABLE. Original reasoning: {payload.get('reasoning', '')}"
+        ),
+    }
+    return "UNVERIFIABLE", new_payload, None
+
+
 def _verify_against_source(claim_text, question, ref_label, title, content, n_votes, max_chars=4000):
     """Verify a claim against one source, gating negative verdicts on full
     source coverage.
@@ -654,6 +706,10 @@ def _verify_against_source(claim_text, question, ref_label, title, content, n_vo
 
     if len(content) <= max_chars:
         verdict, payload, votes = _judge_claim_once(_prompt_for(content), n_votes)
+        reason = _grounding_failure(
+            verdict, payload, re.sub(r"\s+", " ", content).lower())
+        if reason:
+            verdict, payload, votes = _ungrounded_result(verdict, payload, reason)
         return {
             "verdict": verdict, "payload": payload, "all_votes": votes,
             "coverage": 1.0, "rounds": 1,
@@ -661,6 +717,7 @@ def _verify_against_source(claim_text, question, ref_label, title, content, n_vo
         }
 
     excerpt, covered = _find_relevant_spans_with_coverage(claim_text, content, max_chars=max_chars)
+    shown_texts = [excerpt]
     verdict, payload, votes = _judge_claim_once(_prompt_for(excerpt), n_votes)
     rounds = [(verdict, payload, votes)]
 
@@ -679,6 +736,7 @@ def _verify_against_source(claim_text, question, ref_label, title, content, n_vo
         if not complement.strip():
             break
         covered = _merge_ranges(covered + used)
+        shown_texts.append(complement)
         v2, p2, votes2 = _judge_claim_once(_prompt_for(complement), n_votes)
         rounds.append((v2, p2, votes2))
 
@@ -706,6 +764,11 @@ def _verify_against_source(claim_text, question, ref_label, title, content, n_vo
             }
             verdict = "UNVERIFIABLE"
             votes = None
+    reason = _grounding_failure(
+        verdict, payload, re.sub(r"\s+", " ", "\n".join(shown_texts)).lower())
+    if reason:
+        verdict, payload, votes = _ungrounded_result(verdict, payload, reason)
+        negative_confirmed = False
     return {
         "verdict": verdict, "payload": payload, "all_votes": votes,
         "coverage": coverage, "rounds": len(rounds),
@@ -1071,33 +1134,13 @@ def verify_single_claim(
     # quote must still be shown. A matching quote is a necessary condition,
     # never proof of entailment by itself.
     if result_verdict != "UNVERIFIABLE":
-        eq_check = (result.get("evidence_quote") or "").strip()
-        needs_quote = result_verdict in ("SUPPORTED", "PARTIALLY_SUPPORTED", "CONTRADICTED")
-        quote_missing = needs_quote and not eq_check
-        quote_unshown = False
-        if eq_check:
-            evidence_ref = cited_refs[0] if cited_refs else None
-            shown_norm = re.sub(
-                r"\s+", " ", "\n".join(shown_by_ref.get(evidence_ref, []))).lower()
-            quote_norm = re.sub(r"\s+", " ", eq_check[:80]).lower()
-            quote_unshown = bool(quote_norm) and quote_norm not in shown_norm
-        if quote_missing or quote_unshown:
-            why = ("the verdict carried no evidence quote" if quote_missing
-                   else "the evidence quote was not found in the excerpts of the cited source shown to the judge")
-            result = {
-                "verdict": "UNVERIFIABLE",
-                "confidence": result.get("confidence", 0.0),
-                "evidence_quote": "",
-                "evidence_start_phrase": "",
-                "reasoning": (
-                    f"Grounding check failed ({why}); the {result_verdict} "
-                    "verdict is not grounded in the reviewed text of the cited "
-                    "source. Marked UNVERIFIABLE. "
-                    f"Original reasoning: {result.get('reasoning', '')}"
-                ),
-            }
-            result_verdict = "UNVERIFIABLE"
-            all_votes = None
+        evidence_ref = cited_refs[0] if cited_refs else None
+        shown_norm = re.sub(
+            r"\s+", " ", "\n".join(shown_by_ref.get(evidence_ref, []))).lower()
+        reason = _grounding_failure(result_verdict, result, shown_norm)
+        if reason:
+            result_verdict, result, all_votes = _ungrounded_result(
+                result_verdict, result, reason)
 
     # Compute span offset: find evidence_quote in the source content
     evidence_quote = result.get("evidence_quote", "")

@@ -132,8 +132,8 @@ def test_web_per_ref_unverifiable_does_not_count_in_reliability(mock_openai, web
 
     # First call: per-ref SUPPORTED for ref [1]. Second call (if backup kicks in): also SUPPORTED.
     queue = iter([
-        {"verdict": "SUPPORTED", "confidence": 0.95, "evidence_quote": "ok", "reasoning": "supported"},
-        {"verdict": "SUPPORTED", "confidence": 0.95, "evidence_quote": "ok", "reasoning": "backup supported"},
+        {"verdict": "SUPPORTED", "confidence": 0.95, "evidence_quote": "Substantial content of the first source paper", "reasoning": "supported"},
+        {"verdict": "SUPPORTED", "confidence": 0.95, "evidence_quote": "Substantial content of the first source paper", "reasoning": "backup supported"},
     ])
     real_create = mock_openai.create
     def queue_create(*args, **kwargs):

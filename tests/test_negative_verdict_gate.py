@@ -16,8 +16,10 @@ import verify_hallucinations as vh
 def _queue(mock_openai, verdicts):
     """Force the mock to return the given verdicts in order."""
     q = iter([
-        {"verdict": v, "confidence": 0.9, "evidence_quote": "q" if v == "SUPPORTED" else "",
-         "evidence_start_phrase": "q" if v == "SUPPORTED" else "", "reasoning": f"forced {v}"}
+        {"verdict": v, "confidence": 0.9,
+         "evidence_quote": "The architecture attends to every position jointly and in parallel." if v == "SUPPORTED" else "",
+         "evidence_start_phrase": "The architecture attends to every" if v == "SUPPORTED" else "",
+         "reasoning": f"forced {v}"}
         for v in verdicts
     ])
     real_create = mock_openai.create

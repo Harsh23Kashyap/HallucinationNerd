@@ -120,3 +120,51 @@ def test_contradicted_requires_shown_quote(mock_openai):
     result = vh.verify_single_claim(claim, articles, question="Q", question_id="Q1", claim_idx=1)
     assert result.verdict == "UNVERIFIABLE"
     assert "no evidence quote" in result.reasoning
+
+
+def test_prefix_valid_suffix_fabricated_downgrades(mock_openai):
+    """A quote whose prefix is real shown text but whose suffix is fabricated
+    must not ground the verdict."""
+    shown_sentence = "Transformers use self-attention jointly and in parallel."
+    fabricated = "The model achieves 99 percent accuracy on every benchmark."
+    _queue(mock_openai, [_verdict("SUPPORTED", f"{shown_sentence} {fabricated}")])
+    claim = {"claim_text": "Transformers [1] use self-attention.", "cited_refs": [1]}
+    articles = [{"content": shown_sentence + " " + "Padding text here. " * 10, "title": "Paper"}]
+    result = vh.verify_single_claim(claim, articles, question="Q", question_id="Q1", claim_idx=1)
+    assert result.verdict == "UNVERIFIABLE"
+
+
+def test_ellipsis_quote_with_shown_segments_stands(mock_openai):
+    """An ellipsis-separated quote whose segments are all shown is accepted."""
+    content = ("Transformers use self-attention jointly and in parallel. "
+               "Many unrelated sentences about gardening and cookware follow here. "
+               "The ablation removes every residual connection before evaluation.")
+    quote = ("Transformers use self-attention jointly and in parallel. ... "
+             "The ablation removes every residual connection before evaluation.")
+    _queue(mock_openai, [_verdict("SUPPORTED", quote)])
+    claim = {"claim_text": "Transformers [1] use self-attention.", "cited_refs": [1]}
+    articles = [{"content": content, "title": "Paper"}]
+    result = vh.verify_single_claim(claim, articles, question="Q", question_id="Q1", claim_idx=1)
+    assert result.verdict == "SUPPORTED"
+
+
+def test_per_ref_path_unshown_quote_downgrades(mock_openai):
+    """The real website path (verify_claim_per_ref) applies the same check."""
+    head = "Transformers and self-attention mechanisms are discussed here. " * 30
+    filler = "Unrelated filler sentence about gardening and cookware. " * 55
+    tail = "The ablation removes every residual connection before evaluation."
+    content = head + filler + tail + " " + filler[:500]
+    _queue(mock_openai, [_verdict("SUPPORTED", tail)])
+    claim = {"claim_text": "Transformers [1] use self-attention.", "cited_refs": [1]}
+    articles = [{"content": content, "title": "Paper"}]
+    result = vh.verify_claim_per_ref(claim, articles, question="Q", question_id="Q1", claim_idx=1)
+    assert result.verdict == "UNVERIFIABLE"
+    assert "not grounded" in result.per_ref_verdicts[0]["reasoning"]
+
+
+def test_per_ref_path_missing_quote_downgrades(mock_openai):
+    _queue(mock_openai, [_verdict("SUPPORTED", "")])
+    claim = {"claim_text": "Transformers [1] use self-attention.", "cited_refs": [1]}
+    articles = [{"content": "Transformers use self-attention jointly. " * 10, "title": "Paper"}]
+    result = vh.verify_claim_per_ref(claim, articles, question="Q", question_id="Q1", claim_idx=1)
+    assert result.verdict == "UNVERIFIABLE"

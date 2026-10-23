@@ -33,8 +33,8 @@ def test_per_ref_aggregates_supported(mock_openai):
     # Use a list of next_verdict values; mock consumes one per call
     # We have to monkey-patch the mock to not consume (so we can pre-load)
     queue = iter([
-        {"verdict": "NOT_SUPPORTED", "confidence": 0.9, "evidence_quote": "x", "reasoning": "no"},
-        {"verdict": "SUPPORTED", "confidence": 0.95, "evidence_quote": "y", "reasoning": "yes"},
+        {"verdict": "NOT_SUPPORTED", "confidence": 0.9, "evidence_quote": "", "reasoning": "no"},
+        {"verdict": "SUPPORTED", "confidence": 0.95, "evidence_quote": "Adapter paper content", "reasoning": "yes"},
     ])
     real_create = mock_openai.create
     def queue_create(*args, **kwargs):
@@ -89,7 +89,7 @@ def test_per_ref_missing_content(mock_openai):
     """A ref with no content gets UNVERIFIABLE, others still evaluated."""
     from verify_hallucinations import verify_claim_per_ref
     queue = iter([
-        {"verdict": "SUPPORTED", "confidence": 0.9, "evidence_quote": "ok", "reasoning": "y"},
+        {"verdict": "SUPPORTED", "confidence": 0.9, "evidence_quote": "substantial content", "reasoning": "y"},
     ])
     real_create = mock_openai.create
     def queue_create(*args, **kwargs):
@@ -110,7 +110,7 @@ def test_per_ref_out_of_range(mock_openai):
     """A cited ref number not in articles list gets UNVERIFIABLE."""
     from verify_hallucinations import verify_claim_per_ref
     queue = iter([
-        {"verdict": "SUPPORTED", "confidence": 0.9, "evidence_quote": "ok", "reasoning": "y"},
+        {"verdict": "SUPPORTED", "confidence": 0.9, "evidence_quote": "substantial content", "reasoning": "y"},
     ])
     real_create = mock_openai.create
     def queue_create(*args, **kwargs):
