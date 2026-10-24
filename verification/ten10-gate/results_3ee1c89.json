@@ -202,10 +202,10 @@
    "citing_version": "v1",
    "source_id": "2201.01389",
    "source_version": "v5",
-   "clause": "INTRODUCTION Semantic communication aims to preserve task-relevant meaning under channel and bandwidth constraints rather than uniformly protecting every source bit",
+   "clause": "INTRODUCTION Semantic communication aims to preserve task-relevant meaning under channel and bandwidth constraints rather than uniformly protecting every source bit [1].",
    "clause_provenance": "re_derived_from_citing_pdf_labeled",
    "gate_verdict": "UNVERIFIABLE",
-   "gate_reasoning": "No citation provided for this claim"
+   "gate_reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The claim is supported as the content explicitly states that semantic communications focus on transmitting necessary information relevant to the specific task, rather than uniformly protecting every source bit. This aligns with the claim that semantic communication aims to preserve task-relevant meaning under constraints."
   },
   {
    "cohort": "recent2026",
@@ -213,10 +213,10 @@
    "citing_version": "v1",
    "source_id": "2106.02169",
    "source_version": "v2",
-   "clause": "un- derscore the same need for precision. Two additional developments sharpen the motivation for such a framework. First, the large-D expansion connects higher-dimensional Euclidean Schwarzschild black holes to an exact two-dimensional worldsheet background: in an appropriate near-horizon scaling limit, the geometry reduces to the SL(2)k/U(1) cigar, with the coset level k set by the black hole temperature/horizon scale",
+   "clause": "un- derscore the same need for precision. Two additional developments sharpen the motivation for such a framework. First, the large-D expansion connects higher-dimensional Euclidean Schwarzschild black holes to an exact two-dimensional worldsheet background: in an appropriate near-horizon scaling limit, the geometry reduces to the SL(2)k/U(1) cigar, with the coset level k set by the black hole temperature/horizon scale [1].",
    "clause_provenance": "re_derived_from_citing_pdf_labeled",
    "gate_verdict": "UNVERIFIABLE",
-   "gate_reasoning": "No citation provided for this claim"
+   "gate_reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content explicitly states that the large dimension expansion connects higher-dimensional Schwarzschild black holes to a two-dimensional black hole based on SL(2)k/U(1), which aligns with the claim that in an appropriate near-horizon scaling limit, the geometry reduces to the SL(2)k/U(1) cigar."
   },
   {
    "cohort": "old2021",
