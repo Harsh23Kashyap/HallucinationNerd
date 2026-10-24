@@ -1,0 +1,233 @@
+{
+ "verifier_commit": "3ee1c89",
+ "config": {
+  "mode": "single_claim",
+  "model": "gpt-4o",
+  "n_votes": 1,
+  "gate": true,
+  "full_source_recheck": true,
+  "rate_limit_delay": 0.3
+ },
+ "results": [
+  {
+   "cohort": "recent2026",
+   "citing_id": "2609.14310",
+   "citing_version": "v1",
+   "source_id": "2607.20033",
+   "source_version": "v4",
+   "clause": "formulates demonstrations as behavior prompts and learns an in-context visuomotor policy that maps a demonstration and current observation directly to robot actions, while HOST [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "PARTIALLY_SUPPORTED",
+   "gate_reasoning": "The claim states that the method formulates demonstrations as behavior prompts and learns an in-context visuomotor policy that maps a demonstration and current observation directly to robot actions. The content describes HOST as a framework that acquires skills from a single human video demonstration and resolves execution through self-grounded prediction, which involves mapping demonstrations to robot actions. However, the specific formulation of 'behavior prompts' and 'in-context visuomotor policy' is not explicitly mentioned, making the claim only partially supported."
+  },
+  {
+   "cohort": "recent2026",
+   "citing_id": "2601.18824",
+   "citing_version": "v1",
+   "source_id": "2505.23749",
+   "source_version": "v1",
+   "clause": "build on classical pairwise ranking losses such as RankNet, which opti- mize smooth surrogates of ranking quality using logistic link functions Burges et al [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "UNVERIFIABLE",
+   "gate_reasoning": "Provisional NOT_SUPPORTED after 4 round(s); 1 cited source(s) not fully reviewed (supporting passage may lie outside the reviewed excerpts). Marked UNVERIFIABLE instead of accusing the claim. Original reasoning: The content does not mention RankNet or classical pairwise ranking losses. It discusses alignment methods and distortion in AI alignment, focusing on probabilistic comparisons using a Bradley-Terry model and logistic sigmoid functions. However, it does not specifically state that it builds on RankNet or similar classical pairwise ranking losses. The claim attributed to the document is not supported by the provided content."
+  },
+  {
+   "cohort": "recent2026",
+   "citing_id": "2604.17611",
+   "citing_version": "v1",
+   "source_id": "2601.22516",
+   "source_version": "v1",
+   "clause": "a natural setting for stage-aware classification using repeated clinical assessments rather than relying only on baseline snapshots. In SCOPE-PD [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "UNVERIFIABLE",
+   "gate_reasoning": "Provisional NOT_SUPPORTED after 4 round(s); 1 cited source(s) not fully reviewed (supporting passage may lie outside the reviewed excerpts). Marked UNVERIFIABLE instead of accusing the claim. Original reasoning: The content does not mention 'stage-aware classification using repeated clinical assessments' or 'relying only on baseline snapshots' in the context of SCOPE-PD. The study focuses on integrating subjective and objective assessments for Parkinson's disease prediction using machine learning, but it does not specifically discuss stage-aware classification or the use of repeated assessments versus baseline snapshots."
+  },
+  {
+   "cohort": "recent2026",
+   "citing_id": "2604.03908",
+   "citing_version": "v1",
+   "source_id": "2202.05607",
+   "source_version": "v2",
+   "clause": "-ODT proposed for the first time to the best of our knowledge in this paper on top of the main Online Decision Transformer (ODT) work pro- posed in [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "UNVERIFIABLE",
+   "gate_reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content explicitly states that the Online Decision Transformers (ODT) is proposed in this paper, indicating it is a novel contribution. This supports the claim that ODT is proposed for the first time in this paper."
+  },
+  {
+   "cohort": "recent2026",
+   "citing_id": "2603.14304",
+   "citing_version": "v1",
+   "source_id": "2506.21132",
+   "source_version": "v2",
+   "clause": "nt noise synthesis procedure driven by sensor noise models to improve low-light denoising. SIED [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "UNVERIFIABLE",
+   "gate_reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the PARTIALLY_SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content describes a noise synthesis procedure using a calibrated noise model that combines Gaussian, Poisson, and dark-frame distributions, and applies it using an ISO-dependent strategy. This aligns with the claim about a noise synthesis procedure driven by sensor noise models. However, the claim specifically mentions 'improve low-light denoising,' which is not explicitly stated in the content. The content focuses on generating low-light noisy images for a dataset, which implies a potential use for denoising but does not explicitly state it as the purpose. Thus, the claim is partially supported."
+  },
+  {
+   "cohort": "recent2026",
+   "citing_id": "2607.04333",
+   "citing_version": "v1",
+   "source_id": "2201.02177",
+   "source_version": "v1",
+   "clause": "Grokking \u2014 generalization emerging long after the training set is interpolated \u2014 was first reported by Power et al [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "SUPPORTED",
+   "gate_reasoning": "The content explicitly states that the phenomenon of 'grokking' involves generalization occurring long after overfitting, which aligns with the claim that grokking is generalization emerging long after the training set is interpolated. The paper by Power et al. is indeed the source that first reported this phenomenon."
+  },
+  {
+   "cohort": "recent2026",
+   "citing_id": "2604.17061",
+   "citing_version": "v1",
+   "source_id": "2407.18006",
+   "source_version": "v1",
+   "clause": "Standard compendia and surveys record the \u2203R-completeness of homogeneous quadratic feasibility and related degree-two formulations [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "PARTIALLY_SUPPORTED",
+   "gate_reasoning": "The document discusses the complexity class \u2203R and mentions various problems that are \u2203R-complete, including feasibility problems. However, it does not specifically mention 'homogeneous quadratic feasibility' or 'degree-two formulations' as being \u2203R-complete. The claim is partially supported because the document does cover \u2203R-completeness in general and related problems, but it does not explicitly confirm the specific formulations mentioned in the claim."
+  },
+  {
+   "cohort": "recent2026",
+   "citing_id": "2604.17270",
+   "citing_version": "v1",
+   "source_id": "2406.13843",
+   "source_version": "v2",
+   "clause": "From a security perspective, GenAI systems are vulnerable to adversarial threats, including data poison- ing [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "PARTIALLY_SUPPORTED",
+   "gate_reasoning": "The content discusses the potential for GenAI systems to be misused and compromised, which aligns with the claim about vulnerabilities to adversarial threats. However, the specific mention of 'data poisoning' is not found in the provided content. The taxonomy includes tactics involving attacks on GenAI systems, which could encompass adversarial threats, but without explicit mention of data poisoning, the claim is only partially supported."
+  },
+  {
+   "cohort": "old2021",
+   "citing_id": "2102.13551",
+   "citing_version": "v1",
+   "source_id": "1802.00865",
+   "source_version": "v2",
+   "clause": "Regarding the test-\ufb01eld renormalized stress-energy tensors, unfortunately this situa- tion, even if it were to arise in theory, would in practice be unstable to numerical roundo\ufb00error [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "UNVERIFIABLE",
+   "gate_reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content discusses the instability of certain stress-energy tensor types under numerical perturbations and acknowledges the presence of numerical approximation and round-off issues. This supports the claim that such situations would be unstable to numerical round-off error."
+  },
+  {
+   "cohort": "old2021",
+   "citing_id": "2106.13626",
+   "citing_version": "v1",
+   "source_id": "1301.1745",
+   "source_version": "v2",
+   "clause": "and there is a scatter of theoretical and experimental data on the main values of the electronic parameters of polytypes [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "NOT_SUPPORTED",
+   "gate_reasoning": "The content provided does not mention a scatter of theoretical and experimental data on the electronic parameters of polytypes. The document focuses on the optical and mechanical properties of specific materials (C, Si, Ge, and 3C-SiC) calculated from first principles theory, and compares these calculations with existing experimental values. There is no discussion or mention of a scatter of data regarding electronic parameters of polytypes."
+  },
+  {
+   "cohort": "old2021",
+   "citing_id": "2105.00257",
+   "citing_version": "v1",
+   "source_id": "2012.15792",
+   "source_version": "v1",
+   "clause": "lly we identify special diagrams which act as building blocks for several computations of a wide number of observables, con\ufb01rming a pattern already discussed in [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "PARTIALLY_SUPPORTED",
+   "gate_reasoning": "The content discusses the identification of special observables and their diagrammatic explanation as combinations of simple building blocks. This aligns with the claim about identifying special diagrams as building blocks for computations. However, the content does not explicitly mention confirming a pattern discussed in [1], which limits the support to partial."
+  },
+  {
+   "cohort": "old2021",
+   "citing_id": "2105.00435",
+   "citing_version": "v1",
+   "source_id": "2102.07419",
+   "source_version": "v2",
+   "clause": "ature has been experimentally recently achieved by the CLAS collaboration at JLab using a 4He gaseous target [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "SUPPORTED",
+   "gate_reasoning": "The content explicitly states that the CLAS collaboration at Jefferson Lab conducted an experiment using a 4He gaseous target, which aligns with the claim that such a measurement has been experimentally achieved."
+  },
+  {
+   "cohort": "old2021",
+   "citing_id": "2110.04710",
+   "citing_version": "v1",
+   "source_id": "1712.00080",
+   "source_version": "v2",
+   "clause": "2P+SS baseline with ours and in case the combination in P2P+SS makes the other slow down, we replace our Stage-I method with Pix2PixHD and keep our Stage-II (S2) method unchanged, which makes the comparison between S2 and SS a controlled experiment. \u2022 S1+SS [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "UNVERIFIABLE",
+   "gate_reasoning": "Claim text is an extraction fragment (bullet/table shorthand, method-variant designators) with no standalone content assertion; the citation reads as a method-attribution pointer. Abstaining rather than judging - such fragments must never draw an accusation."
+  },
+  {
+   "cohort": "old2021",
+   "citing_id": "2105.07053",
+   "citing_version": "v1",
+   "source_id": "1808.07093",
+   "source_version": "v2",
+   "clause": "INTRODUCTION The study of general relativity on manifolds with boundary is of great importance as these can be used to account for the asymptotics of the gravitational \ufb01eld and the presence of horizons [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "PARTIALLY_SUPPORTED",
+   "gate_reasoning": "The content discusses the importance of studying general relativity on manifolds with boundaries, particularly in the context of asymptotically Minkowskian space-times and the BMS group. It implies the significance of boundaries in understanding gravitational fields and horizons, but does not explicitly state that this is of 'great importance' or directly link it to the asymptotics of gravitational fields and horizons as the claim does. Thus, the claim is partially supported."
+  },
+  {
+   "cohort": "old2021",
+   "citing_id": "2103.00121",
+   "citing_version": "v1",
+   "source_id": "2101.05131",
+   "source_version": "v1",
+   "clause": "xtract powerful features from training data as evidenced by its superior performance compared with DNNs when the number of training data is small [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "SUPPORTED",
+   "gate_reasoning": "The content explicitly states that the VoxelHop framework works reliably with a small number of datasets and achieves superior classification performance compared to state-of-the-art 3D CNN-based methods. This supports the claim that VoxelHop extracts powerful features from training data and performs better than DNNs when the number of training data is small."
+  },
+  {
+   "cohort": "old2021",
+   "citing_id": "2106.02585",
+   "citing_version": "v1",
+   "source_id": "1909.08383",
+   "source_version": "v3",
+   "clause": "ately, in empirical comparison, it quickly becomes apparent that assumptions of individual methods are narrow and seem to often be practically tailored towards the limited use case of a particular benchmark [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "UNVERIFIABLE",
+   "gate_reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the PARTIALLY_SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content discusses the lack of consensus on experimental setups and the specificity of settings under which methods are tested, which aligns with the claim that assumptions of individual methods are narrow and tailored to specific benchmarks. However, the claim's specific wording about 'practically tailored towards the limited use case of a particular benchmark' is not directly stated, hence the partial support."
+  },
+  {
+   "cohort": "old2021",
+   "citing_id": "2104.04704",
+   "citing_version": "v1",
+   "source_id": "1705.07290",
+   "source_version": "v1",
+   "clause": "cacy of this class of model-based deep learning architectures in compressed sensing and sparse- recovery applications [1].",
+   "clause_provenance": "verbatim_from_initial_run",
+   "gate_verdict": "PARTIALLY_SUPPORTED",
+   "gate_reasoning": "The content discusses the efficacy of a class of model-based deep learning architectures in the context of compressed sensing and sparse recovery applications. It specifically mentions improvements in reconstruction SNR using the proposed DNN architectures, which aligns with the claim about efficacy. However, the claim's wording is not directly quoted, hence it is partially supported."
+  },
+  {
+   "cohort": "recent2026",
+   "citing_id": "2609.14616",
+   "citing_version": "v1",
+   "source_id": "2201.01389",
+   "source_version": "v5",
+   "clause": "INTRODUCTION Semantic communication aims to preserve task-relevant meaning under channel and bandwidth constraints rather than uniformly protecting every source bit",
+   "clause_provenance": "re_derived_from_citing_pdf_labeled",
+   "gate_verdict": "UNVERIFIABLE",
+   "gate_reasoning": "No citation provided for this claim"
+  },
+  {
+   "cohort": "recent2026",
+   "citing_id": "2603.07451",
+   "citing_version": "v1",
+   "source_id": "2106.02169",
+   "source_version": "v2",
+   "clause": "un- derscore the same need for precision. Two additional developments sharpen the motivation for such a framework. First, the large-D expansion connects higher-dimensional Euclidean Schwarzschild black holes to an exact two-dimensional worldsheet background: in an appropriate near-horizon scaling limit, the geometry reduces to the SL(2)k/U(1) cigar, with the coset level k set by the black hole temperature/horizon scale",
+   "clause_provenance": "re_derived_from_citing_pdf_labeled",
+   "gate_verdict": "UNVERIFIABLE",
+   "gate_reasoning": "No citation provided for this claim"
+  },
+  {
+   "cohort": "old2021",
+   "citing_id": "2110.04212",
+   "citing_version": "v1",
+   "source_id": "0710.1060",
+   "source_version": "v3",
+   "clause": "th expectation that the planar weak coupling expansion should have a \ufb01nite radius of convergence | \u03bb 4\u03c02 | \u201c 1 with the strong-coupling \u03bb \" 1 asymptotics",
+   "clause_provenance": "re_derived_from_citing_pdf_labeled",
+   "gate_verdict": "UNVERIFIABLE",
+   "gate_reasoning": "No citation provided for this claim"
+  }
+ ]
+}
