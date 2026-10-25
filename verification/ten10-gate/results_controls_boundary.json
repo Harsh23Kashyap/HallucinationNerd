@@ -1,0 +1,74 @@
+{
+  "note": "Boundary controls at uncommitted boundary-sentence state (PARTIAL def: specific assertions never supported by related instances alone). 2 samples each, gpt-4o n_votes=1.",
+  "controls": [
+    {
+      "id": "N1-quantity-contradicted",
+      "claim_vs": "1301.1745v2",
+      "expected": "NOT_SUPPORTED or CONTRADICTED",
+      "observed": [
+        "NOT_SUPPORTED",
+        "NOT_SUPPORTED"
+      ],
+      "result": "holds"
+    },
+    {
+      "id": "N2-comparative-universal",
+      "claim_vs": "2201.02177v1",
+      "expected": "NOT_SUPPORTED or CONTRADICTED",
+      "observed": [
+        "NOT_SUPPORTED",
+        "NOT_SUPPORTED"
+      ],
+      "result": "holds"
+    },
+    {
+      "id": "N3-causal-unsupported",
+      "claim_vs": "2202.05607v2",
+      "expected": "NOT_SUPPORTED",
+      "observed": [
+        "PARTIALLY_SUPPORTED",
+        "PARTIALLY_SUPPORTED"
+      ],
+      "result": "control mis-designed: source genuinely states standard DT collapses when used naively for online data; judge quote verbatim-genuine; claim is borderline spin, PARTIAL defensible. Not counted as defect."
+    },
+    {
+      "id": "N3b-direction-contradicted",
+      "claim": "It is demonstrated that online finetuning harms the performance of decision transformers [1].",
+      "claim_vs": "2202.05607v2 (source shows online finetuning HELPS)",
+      "expected": "CONTRADICTED or NOT_SUPPORTED",
+      "observed_current": [
+        "PARTIALLY_SUPPORTED",
+        "PARTIALLY_SUPPORTED"
+      ],
+      "observed_3ee1c89": [
+        "PARTIALLY_SUPPORTED",
+        "PARTIALLY_SUPPORTED"
+      ],
+      "observed_acd226b": [
+        "PARTIALLY_SUPPORTED",
+        "PARTIALLY_SUPPORTED"
+      ],
+      "result": "OVER-CREDIT, pre-existing at all prompt states; judge leans on genuine but direction-irrelevant 'standard DT collapses' passage. Prompt-resistant at this level; judge-level directional reliability limit."
+    },
+    {
+      "id": "N4-universal",
+      "claim_vs": "2102.07419v2",
+      "expected": "NOT_SUPPORTED (unsupported universal)",
+      "observed": [
+        "UNVERIFIABLE",
+        "UNVERIFIABLE"
+      ],
+      "result": "conservative abstain (provisional negative, coverage-gated); acceptable, no false pass"
+    },
+    {
+      "id": "P1-specific-supported",
+      "claim_vs": "2102.07419v2",
+      "expected": "SUPPORTED",
+      "observed": [
+        "SUPPORTED",
+        "SUPPORTED"
+      ],
+      "result": "holds; positives survive boundary sentence"
+    }
+  ]
+}

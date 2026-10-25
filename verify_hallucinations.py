@@ -178,6 +178,20 @@ CONFIG = {
     "max_retries": 3,
     "rate_limit_delay": 1.0,  # seconds between API calls
     "strictness": "lenient",  # "lenient" (precision) | "strict" (recall)
+    # Never-falsely-accuse gate: when a source had to be excerpted (content
+    # longer than the excerpt budget) and the judge returns NOT_SUPPORTED or
+    # CONTRADICTED, re-verify against the previously unseen regions of the
+    # source before accepting the accusation. The negative verdict is final
+    # only once the full source has been shown; otherwise the claim becomes
+    # UNVERIFIABLE, never "unsupported".
+    "full_source_recheck": True,
+    "max_recheck_rounds": 4,
+    # Complement rounds use a larger excerpt budget than round 1 so that
+    # full coverage of a typical paper (30-45k chars) is reachable within
+    # the round budget: 4k (round 1) + 3 x 12k = 40k. Papers longer than
+    # the reachable coverage are marked UNVERIFIABLE on negative verdicts
+    # rather than accused.
+    "recheck_max_chars": 12000,
 }
 
 # Strictness dial: which verdicts count as a detected hallucination.
@@ -356,14 +370,21 @@ Based solely on your content, determine whether you actually support this claim.
 
 Verdict options:
 - SUPPORTED: Yes, I directly state this or it is logically inferable from what I say. This includes cases where my results/findings/experiments clearly demonstrate the claim even if I don't use those exact words.
-- PARTIALLY_SUPPORTED: I discuss this topic and the gist is correct, but the claim adds specifics or wording I don't use. Also use if my work implicitly supports the claim (e.g., I show large models still hallucinate, which implicitly supports "scaling doesn't fix hallucination").
-- NOT_SUPPORTED: I don't contain information relevant to this claim AT ALL — neither explicitly nor implicitly. This was not attributed to me correctly. The topic of the claim is unrelated to my content.
-- CONTRADICTED: I explicitly say the opposite of this claim.
+- PARTIALLY_SUPPORTED: My content covers the claim's core subject and supports at least part of its specific assertion, but the claim adds specifics or wording I don't use. Also use if my work implicitly supports the claim (e.g., I show large models still hallucinate, which implicitly supports "scaling doesn't fix hallucination"). For a claim that characterizes a body of evidence rather than asserting one specific fact (e.g., that reported data are scattered, mixed, or disagree), an explicit statement of the characterization is NOT required: clear instances of the characterized kind in my content (e.g., results or tables where values visibly disagree) count as support, capped at PARTIALLY_SUPPORTED when my content covers a narrower class than the claim generalizes over. This instance-based reading applies ONLY to characterization claims: a specific assertion - a quantity, a comparison, a causal claim, or a universal claim - is never supported by related instances alone. If the specific assertion is absent from my content, the verdict is NOT_SUPPORTED (or CONTRADICTED when my content says the opposite), regardless of how much related material exists.
+- UNVERIFIABLE also applies when the claim text is an extraction fragment (ablation-table bullet, method-variant shorthand, bibliography residue) that makes no standalone assertion about my content; a citation used as a method-attribution pointer is not a checkable claim. Never answer NOT_SUPPORTED for such fragments.
+- NOT_SUPPORTED: The claim's core subject or its specific assertion is absent from my content — I do not say this, even if I discuss related concepts in the same field. This was not attributed to me correctly. For a characterization claim, do not choose NOT_SUPPORTED merely because I never state the characterization explicitly; choose it only when my content contains no instances of the kind the claim describes.
+- CONTRADICTED: I explicitly say the opposite of this claim, or my methods/results are inconsistent with a specific assertion the claim attributes to me (e.g., the claim says I use repeated measurements when I describe only baseline data).
 - UNVERIFIABLE: My content is unavailable or too sparse to assess.
 
-IMPORTANT: Before choosing NOT_SUPPORTED, verify that the claim's topic is truly absent from your content. If you discuss the same general topic (even from a different angle), you MUST choose PARTIALLY_SUPPORTED — not NOT_SUPPORTED. Reserve NOT_SUPPORTED strictly for cases where your paper is about a completely different subject area (e.g., claim is about "creatine safety" but your paper is about "computer vision"). If there is ANY topical connection between the claim and your content, choose PARTIALLY_SUPPORTED.
+IMPORTANT: Judge the claim's actual content, not its topic. Topical relatedness is not support: discussing related concepts in the same field does not make a claim PARTIALLY_SUPPORTED when its core subject or specific assertion is absent from your content — that is NOT_SUPPORTED. Before choosing NOT_SUPPORTED, check your whole content for the claim's core subject and specific assertion; choose NOT_SUPPORTED only when they are genuinely absent.
+
+CHARACTERIZATION CLAIMS: Some claims characterize a body of evidence instead of asserting one specific fact (e.g., "there is a scatter of theoretical and experimental data", "reported values disagree", "results are mixed"). For these, representative instances in your content - such as a table where calculated and experimental values visibly disagree, or results that vary across methods or settings - are evidence of the characterization and support at least PARTIALLY_SUPPORTED. Choose NOT_SUPPORTED only when your content contains no evidence of the kind the claim characterizes. When the claim generalizes over a broader class than your content covers (e.g., polytypes in general, while you study one materials family and one property), the breadth mismatch limits the verdict to PARTIALLY_SUPPORTED, not NOT_SUPPORTED, provided what you do cover is of the claimed kind.
 
 HOWEVER: If the claim makes a COMPARATIVE statement (e.g., "X is superior/better/more effective than Y"), merely discussing X is NOT enough for PARTIALLY_SUPPORTED. The comparison itself must be present in your content. If you discuss X but never compare it to Y, the comparative claim is NOT_SUPPORTED.
+
+When the claim attributes a method, dataset usage, or analysis to me, verify what I actually did — not what I mention. A property of a dataset I describe (e.g., "participants undergo repeated evaluations"), a citation of someone else's method, and work I explicitly defer to the future do not count as things I did. If the claim says I used an approach that I mention only in passing, only as a dataset property, or only as future work, that specific assertion is NOT_SUPPORTED; if my analysis explicitly restricted itself in the opposite direction (e.g., "only baseline data were used"), the claim is CONTRADICTED.
+
+DIRECTION CHECK: Before choosing your verdict, identify the DIRECTION of the claim's core assertion (e.g., "X increases Y", "X outperforms Y", "X causes Y", "method A is better than B", "values rise with Z") and compare it against the direction my content actually states or demonstrates. If my content asserts or demonstrates the OPPOSITE direction (X decreases Y, Y outperforms X, values fall with Z), the claim is CONTRADICTED - never SUPPORTED or PARTIALLY_SUPPORTED, no matter how closely the topic, quantities, or wording otherwise match. A direction match is required for SUPPORTED; a partial-direction mismatch is CONTRADICTED when my content says the reverse.
 
 Return JSON:
 {
@@ -371,7 +392,8 @@ Return JSON:
     "confidence": 0.0-1.0,
     "evidence_quote": "the EXACT verbatim quote from my content that supports or contradicts this claim (copy-paste, not paraphrase). Empty if not found.",
     "evidence_start_phrase": "the first 5 words of the evidence quote (for locating it in the document)",
-    "reasoning": "brief explanation of my assessment"
+    "reasoning": "brief explanation of my assessment",
+    "directions_opposite": true or false - true ONLY if the claim's core direction is the reverse of what my content states or demonstrates (false otherwise, including when direction does not apply)
 }'''
 
 
@@ -417,8 +439,172 @@ def _find_relevant_spans(claim_text: str, content: str, max_chars: int = 4000, w
 
     This implements the HLD's "reference matching" — finding the most
     relevant spans in the reference for each claim.
+
+    The selection logic lives in _find_relevant_spans_with_coverage; this
+    wrapper keeps the original text-only return for existing callers.
     """
-    # Extract key terms from the claim
+    text, _covered = _find_relevant_spans_with_coverage(
+        claim_text, content, max_chars=max_chars, window=window,
+        top_chunks=top_chunks, anchor_chars=anchor_chars,
+    )
+    return text
+
+
+# ─── Negative-verdict full-source gate ──────────────────────────────────────
+#
+# Failure mode (Oct 14 smoke review): for sources longer than the excerpt
+# budget, the span selector shows the judge only keyword-overlap excerpts. A
+# supporting passage phrased in different vocabulary is never shown, and the
+# judge then returns NOT_SUPPORTED/CONTRADICTED for a claim the source
+# actually supports. The first priority of the verifier is to never falsely
+# accuse a supported claim of non-support, so a negative verdict reached on
+# excerpted content is provisional: the judge is re-shown the previously
+# unseen regions, and the accusation is accepted only once coverage is
+# complete. If the source cannot be fully covered within the round budget,
+# the claim is UNVERIFIABLE - never reported as unsupported.
+
+# Verdicts that accuse the claim and depend on where evidence sits in the
+# source. FABRICATED is deliberately excluded: it concerns the reference
+# itself, not the location of evidence within it.
+_EVIDENCE_SENSITIVE_NEGATIVES = {"NOT_SUPPORTED", "CONTRADICTED"}
+
+# Coverage at or above this fraction counts as "the judge saw the full
+# source" (the final window may be truncated by the excerpt budget).
+_FULL_COVERAGE_THRESHOLD = 0.99
+
+
+def _merge_ranges(ranges):
+    """Merge overlapping or adjacent (start, end) character ranges."""
+    merged = []
+    for s, e in sorted(ranges):
+        if merged and s <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e])
+    return [(s, e) for s, e in merged]
+
+
+def _coverage_fraction(content_len, covered):
+    """Fraction of [0, content_len) covered by the given ranges."""
+    if content_len <= 0:
+        return 1.0
+    return min(1.0, sum(e - s for s, e in _merge_ranges(covered)) / content_len)
+
+
+def _uncovered_ranges(content_len, covered):
+    """Return the gaps of [0, content_len) not present in covered."""
+    gaps = []
+    pos = 0
+    for s, e in _merge_ranges(covered):
+        if s > pos:
+            gaps.append((pos, s))
+        pos = max(pos, e)
+    if pos < content_len:
+        gaps.append((pos, content_len))
+    return gaps
+
+
+def _ranges_to_text(content, ranges, max_chars=4000):
+    """Build an excerpt from explicit character ranges, in document order.
+
+    Returns (text, ranges_actually_used). The last range may be truncated to
+    fit the character budget; the used ranges reflect that truncation so
+    coverage tracking stays exact.
+    """
+    parts = []
+    used = []
+    total = 0
+    for s, e in ranges:
+        remaining = max_chars - total
+        if remaining <= 0:
+            break
+        seg = content[s:e]
+        if len(seg) > remaining:
+            seg = seg[:remaining]
+        if not seg:
+            continue
+        parts.append(seg)
+        used.append((s, s + len(seg)))
+        total += len(seg) + 10  # separator allowance, mirrors _find_relevant_spans
+    return "\n...\n".join(parts), used
+
+
+# --- Qualifier-aware span selection -----------------------------------------
+#
+# Failure mode (SCOPE-PD, Oct 23 live run): the excerpt carried the matched
+# dataset-description sentence ("each participant undergoes repeated
+# evaluations ...") but not the restricting sentence beside it ("only the
+# baseline (i.e., first-visit) data were used"). The judge passed a claim the
+# shown evidence seemed to support while the decisive qualifier sat just
+# outside the shown window. Restriction/contrast sentences score low on claim
+# keyword overlap, so top-k chunk selection misses them even when they sit
+# next to a matched anchor. After selection, scan a small neighborhood around
+# the selected chunks for sentences carrying restriction/contrast markers and
+# include them, so the judge sees the qualifier together with the anchor.
+
+_QUALIFIER_RE = re.compile(
+    r"\b(only|solely|restricted|restricts|restriction|limited to|rather than|"
+    r"instead of|except|excluding|excluded|excludes|baseline|first[- ]visit|"
+    r"subset|however|in contrast|by contrast|whereas|although|despite|"
+    r"nevertheless|conversely)\b",
+    re.IGNORECASE,
+)
+
+_QUALIFIER_NEIGHBORHOOD = 600   # chars each side of a selected chunk
+_QUALIFIER_BUDGET = 900         # max chars of qualifier sentences added
+
+# Same abbreviation list as the claim extractor, so "i.e.," / "et al." do not
+# split qualifier sentences mid-fragment.
+_QUAL_ABBREVS = (
+    "et al", "Fig", "Eq", "i.e", "e.g", "cf", "vs", "approx", "Dr", "Mr",
+    "Mrs", "Ms", "Prof", "St", "No", "Inc", "Ltd", "Co", "Corp", "al",
+    "pp", "Vol",
+)
+
+
+def _iter_sentence_offsets(text, base=0):
+    """Yield (start, end) char offsets of rough sentences in text. A period
+    closing a known abbreviation ("et al.", "i.e.") is not a boundary, so
+    offsets stay true to the original text (no placeholder rewriting)."""
+    start = 0
+    for m in re.finditer(r"(?<=[.!?])\s+", text):
+        head = text[max(0, m.start() - 12):m.start()].rstrip(".!?").lower()
+        if any(head.endswith(abbr.lower()) for abbr in _QUAL_ABBREVS):
+            continue
+        yield base + start, base + m.start()
+        start = m.end()
+    if start < len(text):
+        yield base + start, base + len(text)
+
+
+def _find_qualifier_spans(content, selected_ranges):
+    """Offsets of restriction/contrast sentences sitting just outside the
+    selected chunks, within a small neighborhood of them."""
+    if not selected_ranges:
+        return []
+    merged = _merge_ranges(selected_ranges)
+    spans = []
+    for s, e in merged:
+        lo = max(0, s - _QUALIFIER_NEIGHBORHOOD)
+        hi = min(len(content), e + _QUALIFIER_NEIGHBORHOOD)
+        for ss, se in _iter_sentence_offsets(content[lo:hi], base=lo):
+            sent = content[ss:se]
+            if not _QUALIFIER_RE.search(sent):
+                continue
+            mid = (ss + se) // 2
+            if any(cs <= mid < ce for cs, ce in merged):
+                continue  # already inside a selected chunk
+            spans.append((ss, se))
+    return _merge_ranges(spans) if spans else []
+
+
+def _find_relevant_spans_with_coverage(claim_text: str, content: str, max_chars: int = 4000, window: int = 1000, top_chunks: int = 12, anchor_chars: int = 500):
+    """Same excerpt selection as _find_relevant_spans, but also returns the
+    source character ranges the excerpt was drawn from, so callers can track
+    which parts of the document the judge actually saw.
+
+    Returns (excerpt_text, covered_ranges).
+    """
     stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'been', 'be', 'have', 'has',
                   'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might',
                   'shall', 'can', 'need', 'dare', 'ought', 'used', 'to', 'of', 'in', 'for', 'on',
@@ -429,16 +615,11 @@ def _find_relevant_spans(claim_text: str, content: str, max_chars: int = 4000, w
                      if len(w) > 3 and w.lower() not in stop_words)
 
     if not claim_words:
-        return content[:max_chars]
+        return content[:max_chars], [(0, min(len(content), max_chars))]
 
-    # For very short content (shorter than the window), no chunking is
-    # needed; return as-is.
     if len(content) <= window:
-        return content[:max_chars]
+        return content[:max_chars], [(0, min(len(content), max_chars))]
 
-    # Always include the first and last `anchor_chars` of the document so
-    # the LLM has intro/conclusion context even when key terms live in
-    # the middle.
     anchors = []
     head = content[:anchor_chars]
     tail = content[-anchor_chars:] if len(content) > anchor_chars else ""
@@ -447,22 +628,18 @@ def _find_relevant_spans(claim_text: str, content: str, max_chars: int = 4000, w
     if tail and tail != head:
         anchors.append((len(content) - anchor_chars, tail))
 
-    # Split content into overlapping windows and score each by keyword overlap
     chunks = []
-    step = max(50, window // 5)  # 5 windows per window-width for finer granularity
+    step = max(50, window // 5)
     for i in range(0, len(content) - window, step):
         chunk = content[i:i + window]
         chunk_words = set(w.lower().strip('.,;:()[]') for w in chunk.split())
         score = len(claim_words & chunk_words)
         chunks.append((score, i, chunk))
 
-    # Sort by relevance score, take top chunks
     chunks.sort(key=lambda x: -x[0])
 
-    # Combine: top chunks (deduped against anchors by position) + anchors.
-    # Then sort by position to maintain document order.
     selected_positions = set()
-    result_parts = []  # list of (position, text)
+    result_parts = []
 
     for score, pos, chunk in chunks[:top_chunks]:
         if score >= 2 and pos not in selected_positions:
@@ -474,15 +651,273 @@ def _find_relevant_spans(claim_text: str, content: str, max_chars: int = 4000, w
             result_parts.append((pos, anchor))
             selected_positions.add(pos)
 
+    # Merge overlapping/adjacent selected ranges into whole regions before
+    # the budget runs. Chunks overlap heavily (step < window), so the naive
+    # per-chunk budget kept the first chunk of a region and dropped the rest,
+    # trimming decisive text (the SCOPE-PD restricting sentence sat in the
+    # dropped overlap tail of the selected top chunks).
+    merged = []
+    for pos, chunk in sorted(result_parts, key=lambda x: x[0]):
+        s, e = pos, pos + len(chunk)
+        if merged and s <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e])
+    result_parts = [(s, content[s:e]) for s, e in merged]
+
+    qualifier_spans = _find_qualifier_spans(content, [(s, e) for s, e in merged])
+    q_budget = _QUALIFIER_BUDGET
+    for qs, qe in qualifier_spans:
+        seg = content[qs:qe]
+        if len(seg) > q_budget:
+            continue
+        q_budget -= len(seg)
+        result_parts.append((qs, seg))
+
     result_parts.sort(key=lambda x: x[0])
     result = ""
+    covered = []
     for pos, chunk in result_parts:
         if len(result) + len(chunk) + 10 > max_chars:
+            # Keep the region's prefix up to the remaining budget rather than
+            # dropping it whole; covered reflects the truncation exactly.
+            remaining = max_chars - len(result) - (10 if result else 0)
+            if remaining > 0:
+                if result:
+                    result += "\n...\n"
+                result += chunk[:remaining]
+                covered.append((pos, pos + min(len(chunk), remaining)))
             break
         if result:
             result += "\n...\n"
         result += chunk
-    return result
+        covered.append((pos, pos + len(chunk)))
+    return result, covered
+
+
+def _judge_claim_once(user_prompt, n_votes):
+    """Run one verification round: n_votes LLM passes with a majority verdict.
+
+    Returns (verdict, payload, all_votes).
+    """
+    passes = []
+    for _ in range(max(1, n_votes)):
+        raw = llm_call(
+            CITATION_VERIFICATION_PROMPT,
+            user_prompt,
+            response_format={"type": "json_object"},
+        )
+        try:
+            passes.append(json.loads(raw))
+        except json.JSONDecodeError:
+            passes.append({
+                "verdict": "UNVERIFIABLE",
+                "confidence": 0.0,
+                "evidence_quote": "",
+                "evidence_start_phrase": "",
+                "reasoning": "Failed to parse verification response",
+            })
+    # Deterministic direction guard: when the judge itself reports that the
+    # claim's direction is the reverse of the source's, a supportive verdict
+    # is internally inconsistent; correct it before any vote counting.
+    for p in passes:
+        if p.get("directions_opposite") is True and p.get("verdict") in (
+            "SUPPORTED",
+            "PARTIALLY_SUPPORTED",
+        ):
+            p["reasoning"] = (
+                "[direction guard] judge reported directions_opposite=true with a "
+                "supportive verdict; overriding to CONTRADICTED. Original reasoning: "
+                + str(p.get("reasoning", ""))
+            )
+            p["verdict"] = "CONTRADICTED"
+    votes = [p.get("verdict", "UNVERIFIABLE") for p in passes]
+    if n_votes > 1:
+        vote_counts = Counter(votes)
+        verdict = vote_counts.most_common(1)[0][0]
+        payload = next(p for p, v in zip(passes, votes) if v == verdict)
+    else:
+        payload = passes[0]
+        verdict = payload.get("verdict", "UNVERIFIABLE")
+    return verdict, payload, votes
+
+
+def _verdict_rank(verdict):
+    try:
+        return _PER_REF_AGGREGATION_ORDER.index(verdict)
+    except ValueError:
+        return -1
+
+
+def _quote_in_shown(quote: str, shown_norm: str) -> bool:
+    """True when the full evidence quote appears in the shown text.
+
+    Whitespace-normalized on both sides. A quote of the form "start ... end"
+    (ellipsis skipping source text) is checked span by span; every span must
+    be substantive (>=10 chars) and present. A prefix-valid quote with a
+    fabricated or contradictory suffix fails the full-quote match and has no
+    valid ellipsis split, so it does not ground.
+    """
+    q = re.sub(r"\s+", " ", (quote or "")).strip().lower()
+    if not q:
+        return False
+    if q in shown_norm:
+        return True
+    parts = [p.strip() for p in re.split(r"\.\.\.|\u2026", q) if p.strip()]
+    if len(parts) >= 2 and all(len(p) >= 10 for p in parts):
+        return all(p in shown_norm for p in parts)
+    return False
+
+
+def _grounding_failure(verdict: str, payload: dict, shown_norm: str):
+    """Return a failure reason when the verdict is not grounded in shown
+    evidence, else None. A shown quote is necessary, never proof of
+    entailment. NOT_SUPPORTED asserts absence, so it needs no quote (it is
+    coverage-gated), but a quote it supplies must still be shown."""
+    if verdict == "UNVERIFIABLE":
+        return None
+    quote = (payload.get("evidence_quote") or "").strip()
+    if verdict in ("SUPPORTED", "PARTIALLY_SUPPORTED", "CONTRADICTED") and not quote:
+        return "the verdict carried no evidence quote"
+    if quote and not _quote_in_shown(quote, shown_norm):
+        return ("the evidence quote was not found in the excerpts of the "
+                "cited source shown to the judge")
+    return None
+
+
+def _ungrounded_result(verdict: str, payload: dict, reason: str):
+    """Downgrade an ungrounded verdict to UNVERIFIABLE."""
+    new_payload = {
+        "verdict": "UNVERIFIABLE",
+        "confidence": payload.get("confidence", 0.0),
+        "evidence_quote": "",
+        "evidence_start_phrase": "",
+        "reasoning": (
+            f"Grounding check failed ({reason}); the {verdict} verdict is not "
+            "grounded in the reviewed text of the cited source. Marked "
+            f"UNVERIFIABLE. Original reasoning: {payload.get('reasoning', '')}"
+        ),
+    }
+    return "UNVERIFIABLE", new_payload, None
+
+
+def _verify_against_source(claim_text, question, ref_label, title, content, n_votes, max_chars=4000):
+    """Verify a claim against one source, gating negative verdicts on full
+    source coverage.
+
+    Round 1 shows the judge the keyword-selected excerpts (or the whole
+    source when it fits). If the verdict is NOT_SUPPORTED/CONTRADICTED and
+    parts of the source were never shown, further rounds show the unseen
+    regions. The strongest verdict across rounds wins. A negative verdict is
+    accepted only once coverage is complete; otherwise the claim becomes
+    UNVERIFIABLE with the unconfirmed negative recorded in the reasoning.
+
+    Returns a dict: verdict, payload (fields from the winning round),
+    all_votes, coverage, rounds, negative_confirmed.
+    """
+    header = f"[{ref_label}] {title}\n"
+
+    def _prompt_for(source_text):
+        return (
+            f"ORIGINAL QUESTION: {question}\n\n"
+            f"CLAIM ATTRIBUTED TO YOU: {claim_text}\n\n"
+            f"YOUR CONTENT:\n{header}{source_text}"
+        )
+
+    if len(content) <= max_chars:
+        verdict, payload, votes = _judge_claim_once(_prompt_for(content), n_votes)
+        reason = _grounding_failure(
+            verdict, payload, re.sub(r"\s+", " ", content).lower())
+        if reason:
+            verdict, payload, votes = _ungrounded_result(verdict, payload, reason)
+        return {
+            "verdict": verdict, "payload": payload, "all_votes": votes,
+            "coverage": 1.0, "rounds": 1,
+            "negative_confirmed": verdict in _EVIDENCE_SENSITIVE_NEGATIVES,
+        }
+
+    excerpt, covered = _find_relevant_spans_with_coverage(claim_text, content, max_chars=max_chars)
+    shown_texts = [excerpt]
+    verdict, payload, votes = _judge_claim_once(_prompt_for(excerpt), n_votes)
+    rounds = [(verdict, payload, votes)]
+
+    gate_on = CONFIG.get("full_source_recheck", True)
+    max_rounds = max(1, int(CONFIG.get("max_recheck_rounds", 4)))
+    # A direction-guard CONTRADICTED is a positive finding (the judge identified
+    # the claim's direction as the reverse of shown evidence), not an absence
+    # claim. It is confirmed by the evidence already shown, so it must not be
+    # rechecked for an upgrade nor overturned by a stronger verdict in a later
+    # complement round.
+    def _direction_contradicted(rounds_):
+        return any(
+            v == "CONTRADICTED" and p.get("directions_opposite") is True
+            for v, p, _ in rounds_
+        )
+    while (
+        gate_on
+        and not _direction_contradicted(rounds)
+        and _verdict_rank(rounds[-1][0]) == max(_verdict_rank(r[0]) for r in rounds)
+        and rounds[-1][0] in _EVIDENCE_SENSITIVE_NEGATIVES
+        and _coverage_fraction(len(content), covered) < _FULL_COVERAGE_THRESHOLD
+        and len(rounds) < max_rounds
+    ):
+        gaps = _uncovered_ranges(len(content), covered)
+        complement, used = _ranges_to_text(
+            content, gaps, max_chars=int(CONFIG.get("recheck_max_chars", 12000)))
+        if not complement.strip():
+            break
+        covered = _merge_ranges(covered + used)
+        shown_texts.append(complement)
+        v2, p2, votes2 = _judge_claim_once(_prompt_for(complement), n_votes)
+        rounds.append((v2, p2, votes2))
+
+    if _direction_contradicted(rounds):
+        verdict, payload, votes = next(
+            r for r in rounds
+            if r[0] == "CONTRADICTED" and r[1].get("directions_opposite") is True
+        )
+    else:
+        verdict, payload, votes = max(rounds, key=lambda r: _verdict_rank(r[0]))
+    coverage = _coverage_fraction(len(content), covered)
+    negative_confirmed = False
+    direction_guarded = (
+        verdict == "CONTRADICTED" and payload.get("directions_opposite") is True
+    )
+    if verdict in _EVIDENCE_SENSITIVE_NEGATIVES:
+        if direction_guarded:
+            # Positive finding of reversed direction in shown evidence; not an
+            # absence claim, so full coverage is not a precondition.
+            negative_confirmed = True
+        elif coverage >= _FULL_COVERAGE_THRESHOLD or not gate_on:
+            negative_confirmed = True
+        else:
+            # Never accuse on partial viewing: the supporting passage may sit
+            # in the region the judge never saw.
+            original = verdict
+            payload = {
+                "verdict": "UNVERIFIABLE",
+                "confidence": payload.get("confidence", 0.0),
+                "evidence_quote": "",
+                "evidence_start_phrase": "",
+                "reasoning": (
+                    f"Provisional {original} after {len(rounds)} round(s) covered "
+                    f"{coverage:.0%} of the source; supporting passage may lie "
+                    "outside the reviewed excerpts. Marked UNVERIFIABLE instead "
+                    f"of accusing the claim. Original reasoning: {payload.get('reasoning', '')}"
+                ),
+            }
+            verdict = "UNVERIFIABLE"
+            votes = None
+    reason = _grounding_failure(
+        verdict, payload, re.sub(r"\s+", " ", "\n".join(shown_texts)).lower())
+    if reason:
+        verdict, payload, votes = _ungrounded_result(verdict, payload, reason)
+        negative_confirmed = False
+    return {
+        "verdict": verdict, "payload": payload, "all_votes": votes,
+        "coverage": coverage, "rounds": len(rounds),
+        "negative_confirmed": negative_confirmed,
+    }
 
 
 def _search_backup_reference(claim_text: str, question: str, question_id: str, claim_idx: int, search_fn) -> 'ClaimVerification':
@@ -695,6 +1130,49 @@ def search_pubmed(query: str, max_results: int = 3) -> list:
         return []
 
 
+
+def _is_non_assertion_fragment(text: str) -> bool:
+    """Detect extraction fragments that carry no checkable content assertion:
+    ablation-table bullets and method-variant shorthand (e.g. "S1+SS [1]")
+    where the citation is a method-attribution pointer, not a claim about the
+    source's content. Such fragments must abstain (UNVERIFIABLE), never accuse.
+
+    Conservative by design: requires a bullet/table marker AND method-designator
+    density, so ordinary claims that merely name methods ("BERT outperforms
+    GPT-2 on SQuAD [1]") still go to the judge.
+    """
+    if not text:
+        return False
+    t = re.sub(r"\[\d+(?:\s*,\s*\d+)*\]", " ", text)  # strip citation markers
+    if not re.search(r"[\u2022\u25aa\u25e6]|\t|^\s*[-*]\s", t, re.M):
+        return False  # no bullet/table marker: not this failure mode
+    tokens = t.split()
+    if not tokens:
+        return False
+    designators = [w for w in tokens
+                   if re.fullmatch(r"[A-Za-z]*\d+[A-Za-z0-9]*(?:[-+][A-Za-z0-9]+)*", w)
+                   or re.fullmatch(r"[A-Z][A-Za-z0-9]*[+/-][A-Za-z0-9]+", w)]
+    return len(designators) / len(tokens) >= 0.05
+
+
+def _fragment_abstention(question_id: str, claim_idx: int, claim_text: str, cited_refs: list) -> "ClaimVerification":
+    return ClaimVerification(
+        question_id=question_id,
+        claim_id=f"{question_id}-C{claim_idx}",
+        claim_text=claim_text,
+        cited_refs=list(cited_refs),
+        verdict="UNVERIFIABLE",
+        confidence=0.5,
+        evidence_quote="",
+        evidence_reference="",
+        evidence_span_start=-1,
+        evidence_span_end=-1,
+        reasoning=("Claim text is an extraction fragment (bullet/table shorthand, "
+                   "method-variant designators) with no standalone content assertion; "
+                   "the citation reads as a method-attribution pointer. Abstaining "
+                   "rather than judging - such fragments must never draw an accusation."),
+    )
+
 def verify_single_claim(
     claim: dict, articles: list, question: str, question_id: str, claim_idx: int,
     search_backup: bool = False, search_fn=None, n_votes: int = 1
@@ -711,6 +1189,10 @@ def verify_single_claim(
     """
     cited_refs = claim.get("cited_refs", [])
     claim_text = claim.get("claim_text", "")
+
+    # Extraction fragments (ablation bullets, method shorthand) abstain; never accuse.
+    if _is_non_assertion_fragment(claim_text):
+        return _fragment_abstention(question_id, claim_idx, claim_text, cited_refs)
 
     if not cited_refs:
         # NEW: If search_backup enabled, try to find a reference for uncited claims
@@ -731,24 +1213,34 @@ def verify_single_claim(
             reasoning="No citation provided for this claim",
         )
 
-    # Gather content from cited articles — find most relevant spans
+    # Gather content from cited articles — find most relevant spans.
+    # Track per-ref source content and which character ranges were shown, so
+    # a negative verdict can be rechecked against the unseen regions
+    # (never-falsely-accuse gate).
     source_texts = []
+    long_refs = []  # mutable [ref_num, title, content, covered_ranges]
+    shown_by_ref = {}  # ref_num -> every chunk of that ref the judge is shown
     for ref_num in cited_refs:
         idx = ref_num - 1  # 0-indexed
         if 0 <= idx < len(articles):
             art = articles[idx]
             content = art.get("content") or art.get("abstract") or art.get("summary") or ""
             title = art.get("title", f"Article {ref_num}")
-            
+
             # If content is short enough, use it all
             if len(content) <= 4000:
-                source_texts.append(f"[{ref_num}] {title}\n{content}")
+                shown = f"[{ref_num}] {title}\n{content}"
+                source_texts.append(shown)
             else:
                 # Find the most relevant spans for this claim
-                relevant_chunk = _find_relevant_spans(claim_text, content)
-                source_texts.append(f"[{ref_num}] {title}\n{relevant_chunk}")
+                relevant_chunk, covered = _find_relevant_spans_with_coverage(claim_text, content)
+                shown = f"[{ref_num}] {title}\n{relevant_chunk}"
+                source_texts.append(shown)
+                long_refs.append([ref_num, title, content, covered])
         else:
-            source_texts.append(f"[{ref_num}] (article not found in retrieved set)")
+            shown = f"[{ref_num}] (article not found in retrieved set)"
+            source_texts.append(shown)
+        shown_by_ref.setdefault(ref_num, []).append(shown)
 
     source_block = "\n\n---\n\n".join(source_texts)
 
@@ -758,37 +1250,88 @@ def verify_single_claim(
         f"YOUR CONTENT:\n{source_block}"
     )
 
-    # Run n_votes passes and collect parsed results
-    passes = []
-    for _ in range(max(1, n_votes)):
-        raw = llm_call(
-            CITATION_VERIFICATION_PROMPT,
-            user_prompt,
-            response_format={"type": "json_object"},
+    result_verdict, result, all_votes = _judge_claim_once(user_prompt, n_votes)
+
+    # Never-falsely-accuse gate: a negative verdict reached while part of a
+    # cited source was never shown is provisional. Re-show the unseen regions
+    # (all long refs' gaps combined per round) and accept the accusation only
+    # when every long source has been fully covered. Otherwise the claim is
+    # UNVERIFIABLE - never reported as unsupported.
+    gate_on = CONFIG.get("full_source_recheck", True)
+    max_rounds = max(1, int(CONFIG.get("max_recheck_rounds", 4)))
+    rounds = 1
+    while (
+        gate_on
+        and result_verdict in _EVIDENCE_SENSITIVE_NEGATIVES
+        and long_refs
+        and any(_coverage_fraction(len(lr[2]), lr[3]) < _FULL_COVERAGE_THRESHOLD for lr in long_refs)
+        and rounds < max_rounds
+    ):
+        complement_texts = []
+        for lr in long_refs:
+            ref_num, title, content, covered = lr
+            if _coverage_fraction(len(content), covered) >= _FULL_COVERAGE_THRESHOLD:
+                continue
+            complement, used = _ranges_to_text(
+                content, _uncovered_ranges(len(content), covered),
+                max_chars=int(CONFIG.get("recheck_max_chars", 12000)))
+            if not complement.strip():
+                continue
+            lr[3] = _merge_ranges(covered + used)
+            shown_comp = f"[{ref_num}] {title}\n{complement}"
+            complement_texts.append(shown_comp)
+            shown_by_ref.setdefault(ref_num, []).append(shown_comp)
+        if not complement_texts:
+            break
+        complement_block = "\n\n---\n\n".join(complement_texts)
+        recheck_prompt = (
+            f"ORIGINAL QUESTION: {question}\n\n"
+            f"CLAIM ATTRIBUTED TO YOU: {claim_text}\n\n"
+            f"YOUR CONTENT:\n{complement_block}"
         )
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            parsed = {
+        v2, p2, votes2 = _judge_claim_once(recheck_prompt, n_votes)
+        rounds += 1
+        if _verdict_rank(v2) > _verdict_rank(result_verdict):
+            result_verdict, result, all_votes = v2, p2, votes2
+
+    if result_verdict in _EVIDENCE_SENSITIVE_NEGATIVES and gate_on and long_refs:
+        incomplete = [lr for lr in long_refs
+                      if _coverage_fraction(len(lr[2]), lr[3]) < _FULL_COVERAGE_THRESHOLD]
+        if incomplete:
+            # Never accuse on partial viewing: supporting evidence may sit in
+            # the region the judge never saw.
+            result = {
                 "verdict": "UNVERIFIABLE",
-                "confidence": 0.0,
+                "confidence": result.get("confidence", 0.0),
                 "evidence_quote": "",
                 "evidence_start_phrase": "",
-                "reasoning": "Failed to parse verification response",
+                "reasoning": (
+                    f"Provisional {result_verdict} after {rounds} round(s); "
+                    f"{len(incomplete)} cited source(s) not fully reviewed "
+                    "(supporting passage may lie outside the reviewed excerpts). "
+                    "Marked UNVERIFIABLE instead of accusing the claim. "
+                    f"Original reasoning: {result.get('reasoning', '')}"
+                ),
             }
-        passes.append(parsed)
+            all_votes = None
 
-    all_votes = [p.get("verdict", "UNVERIFIABLE") for p in passes]
-
-    if n_votes > 1:
-        # Majority vote on verdict; break ties by keeping first-seen order
-        vote_counts = Counter(all_votes)
-        majority_verdict = vote_counts.most_common(1)[0][0]
-        # Use the fields (confidence/evidence/reasoning) from the first pass
-        # whose verdict matches the majority, so the report stays internally consistent
-        result = next(p for p, v in zip(passes, all_votes) if v == majority_verdict)
-    else:
-        result = passes[0]
+    # Never-falsely-pass grounding check (mirror of the accusation gate).
+    # SUPPORTED / PARTIALLY_SUPPORTED / CONTRADICTED must carry an evidence
+    # quote, and the quote must appear in the chunks of THAT cited ref the
+    # judge was actually shown - otherwise the verdict rested on unseen
+    # content (e.g. parametric knowledge of a well-known dataset) and is
+    # downgraded to UNVERIFIABLE. NOT_SUPPORTED asserts absence, so it needs
+    # no quote (it is already coverage-gated), but if it supplies one the
+    # quote must still be shown. A matching quote is a necessary condition,
+    # never proof of entailment by itself.
+    if result_verdict != "UNVERIFIABLE":
+        evidence_ref = cited_refs[0] if cited_refs else None
+        shown_norm = re.sub(
+            r"\s+", " ", "\n".join(shown_by_ref.get(evidence_ref, []))).lower()
+        reason = _grounding_failure(result_verdict, result, shown_norm)
+        if reason:
+            result_verdict, result, all_votes = _ungrounded_result(
+                result_verdict, result, reason)
 
     # Compute span offset: find evidence_quote in the source content
     evidence_quote = result.get("evidence_quote", "")
@@ -892,6 +1435,10 @@ def verify_claim_per_ref(
     cited_refs = claim.get("cited_refs", [])
     claim_text = claim.get("claim_text", "")
 
+    # Extraction fragments (ablation bullets, method shorthand) abstain; never accuse.
+    if _is_non_assertion_fragment(claim_text):
+        return _fragment_abstention(question_id, claim_idx, claim_text, cited_refs)
+
     if not cited_refs:
         # No citations: fall through to the same uncited-claim path as
         # verify_single_claim (search_backup or UNVERIFIABLE).
@@ -944,13 +1491,6 @@ def verify_claim_per_ref(
             })
             continue
 
-        # Build a single-ref source block and call the LLM
-        if len(content) <= 4000:
-            relevant = content
-        else:
-            relevant = _find_relevant_spans(claim_text, content)
-        source_block = f"[{ref_num}] {title}\n{relevant}"
-
         # H1: NLI pre-filter (optional, default off). If enabled and the
         # NLI model is confident (>= SHORT_CIRCUIT_*_THRESHOLD), skip the
         # LLM call for this ref entirely. Saves cost and latency on
@@ -958,6 +1498,11 @@ def verify_claim_per_ref(
         nli_short_circuited = False
         try:
             import hve_nli
+            if len(content) <= 4000:
+                relevant = content
+            else:
+                relevant = _find_relevant_spans(claim_text, content)
+            source_block = f"[{ref_num}] {title}\n{relevant}"
             short = hve_nli.maybe_short_circuit(claim_text, source_block)
             if short is not None:
                 verdict_label, conf, _eq = short
@@ -973,51 +1518,37 @@ def verify_claim_per_ref(
         except ImportError:
             pass  # hve_nli not on path; skip
 
-        user_prompt = (
-            f"ORIGINAL QUESTION: {question}\n\n"
-            f"CLAIM ATTRIBUTED TO YOU: {claim_text}\n\n"
-            f"YOUR CONTENT:\n{source_block}"
-        ) if not nli_short_circuited else ""
-
-        if nli_short_circuited:
-            # Skip LLM call entirely; ref_verdict and ref_payload already set
-            passes = [ref_payload]
+        if not nli_short_circuited:
+            # Verify against this ref with the never-falsely-accuse gate:
+            # negative verdicts on excerpted sources are rechecked against
+            # the previously unseen regions before being accepted.
+            outcome = _verify_against_source(
+                claim_text, question, ref_num, title, content, n_votes
+            )
+            ref_verdict = outcome["verdict"]
+            ref_payload = outcome["payload"]
+            ref_coverage = outcome["coverage"]
+            ref_rounds = outcome["rounds"]
+            ref_negative_confirmed = outcome["negative_confirmed"]
         else:
-            # n_votes: majority over the votes for this single ref
-            passes = []
-            for _ in range(max(1, n_votes)):
-                raw = llm_call(
-                    CITATION_VERIFICATION_PROMPT,
-                    user_prompt,
-                    response_format={"type": "json_object"},
-                )
-                try:
-                    passes.append(json.loads(raw))
-                except json.JSONDecodeError:
-                    passes.append({
-                        "verdict": "UNVERIFIABLE",
-                        "confidence": 0.0,
-                        "evidence_quote": "",
-                        "evidence_start_phrase": "",
-                        "reasoning": "Failed to parse verification response",
-                    })
-
-            if n_votes > 1:
-                vote_counts = Counter(p.get("verdict", "UNVERIFIABLE") for p in passes)
-                ref_verdict = vote_counts.most_common(1)[0][0]
-                ref_payload = next(p for p, v in zip(passes, [pp.get("verdict", "UNVERIFIABLE") for pp in passes]) if v == ref_verdict)
-            else:
-                ref_verdict = passes[0].get("verdict", "UNVERIFIABLE")
-                ref_payload = passes[0]
+            ref_coverage = None
+            ref_rounds = 0
+            ref_negative_confirmed = None
 
         ref_confidence = float(ref_payload.get("confidence", 0.0))
-        per_ref_verdicts.append({
+        entry = {
             "ref_num": ref_num,
             "verdict": ref_verdict,
             "confidence": ref_confidence,
             "evidence_quote": ref_payload.get("evidence_quote", ""),
             "reasoning": ref_payload.get("reasoning", ""),
-        })
+        }
+        if ref_coverage is not None:
+            entry["coverage"] = round(ref_coverage, 4)
+            entry["recheck_rounds"] = ref_rounds
+            if ref_negative_confirmed:
+                entry["negative_confirmed_full_source"] = True
+        per_ref_verdicts.append(entry)
 
         # Aggregate: take the strongest verdict
         rank = _PER_REF_AGGREGATION_ORDER.index(ref_verdict) if ref_verdict in _PER_REF_AGGREGATION_ORDER else -1
@@ -1160,11 +1691,21 @@ def verify_citations_for_question(entry: dict, search_backup: bool = False, n_vo
         return []
 
     if single_claim:
+        raw_refs = extract_cited_refs(synopsis)
+        # The pre-paired benchmark keeps the source paper's original citation
+        # markers in the extracted sentence, but only the mapped ref resolves
+        # against retrieved_articles. Unresolvable refs are extraction
+        # artifacts here (not fabrication signal - that detection lives in
+        # the website path), so keep them out of the judge's prompt.
+        resolvable = [n for n in raw_refs if 0 <= n - 1 < len(articles)]
+        dropped = [n for n in raw_refs if not (0 <= n - 1 < len(articles))]
         claims = [{
             "claim_text": synopsis,
-            "cited_refs": extract_cited_refs(synopsis),
+            "cited_refs": resolvable,
+            "dropped_unresolvable_refs": dropped,
         }]
-        print(f"  [{question_id}] Single-claim mode: 1 claim, cited_refs={claims[0]['cited_refs']}")
+        print(f"  [{question_id}] Single-claim mode: 1 claim, cited_refs={resolvable}"
+              + (f" (dropped {len(dropped)} unresolvable)" if dropped else ""))
     else:
         print(f"  [{question_id}] Decomposing claims...")
         claims = decompose_claims(synopsis)

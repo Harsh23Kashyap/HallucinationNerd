@@ -94,7 +94,7 @@ def test_supported_ref_skips_search_backup(mock_openai):
     from verify_hallucinations import verify_claim_per_ref
 
     mock_openai.next_verdict = {
-        "verdict": "SUPPORTED", "confidence": 0.9, "evidence_quote": "ok", "reasoning": "ok"
+        "verdict": "SUPPORTED", "confidence": 0.9, "evidence_quote": "substantial content", "reasoning": "ok"
     }
     claim = {"claim_text": "Some claim [1].", "cited_refs": [1]}
     articles = [{"content": "This is a substantial content for the source paper."}]

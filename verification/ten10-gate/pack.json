@@ -1,0 +1,182 @@
+[
+ {
+  "cohort": "recent2026",
+  "citing_id": "2609.14310",
+  "citing_version": "v1",
+  "source_id": "2607.20033",
+  "source_version": "v4",
+  "clause": "formulates demonstrations as behavior prompts and learns an in-context visuomotor policy that maps a demonstration and current observation directly to robot actions, while HOST [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2601.18824",
+  "citing_version": "v1",
+  "source_id": "2505.23749",
+  "source_version": "v1",
+  "clause": "build on classical pairwise ranking losses such as RankNet, which opti- mize smooth surrogates of ranking quality using logistic link functions Burges et al [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2604.17611",
+  "citing_version": "v1",
+  "source_id": "2601.22516",
+  "source_version": "v1",
+  "clause": "a natural setting for stage-aware classification using repeated clinical assessments rather than relying only on baseline snapshots. In SCOPE-PD [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2604.03908",
+  "citing_version": "v1",
+  "source_id": "2202.05607",
+  "source_version": "v2",
+  "clause": "-ODT proposed for the first time to the best of our knowledge in this paper on top of the main Online Decision Transformer (ODT) work pro- posed in [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2603.14304",
+  "citing_version": "v1",
+  "source_id": "2506.21132",
+  "source_version": "v2",
+  "clause": "nt noise synthesis procedure driven by sensor noise models to improve low-light denoising. SIED [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2607.04333",
+  "citing_version": "v1",
+  "source_id": "2201.02177",
+  "source_version": "v1",
+  "clause": "Grokking \u2014 generalization emerging long after the training set is interpolated \u2014 was first reported by Power et al [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2609.14616",
+  "citing_version": "v1",
+  "source_id": "2201.01389",
+  "source_version": "v5",
+  "clause": "INTRODUCTION Semantic communication aims to preserve task-relevant meaning under channel and bandwidth constraints rather than uniformly protecting every source bit [1].",
+  "clause_provenance": "re_derived_from_citing_pdf_labeled"
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2604.17061",
+  "citing_version": "v1",
+  "source_id": "2407.18006",
+  "source_version": "v1",
+  "clause": "Standard compendia and surveys record the \u2203R-completeness of homogeneous quadratic feasibility and related degree-two formulations [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2603.07451",
+  "citing_version": "v1",
+  "source_id": "2106.02169",
+  "source_version": "v2",
+  "clause": "un- derscore the same need for precision. Two additional developments sharpen the motivation for such a framework. First, the large-D expansion connects higher-dimensional Euclidean Schwarzschild black holes to an exact two-dimensional worldsheet background: in an appropriate near-horizon scaling limit, the geometry reduces to the SL(2)k/U(1) cigar, with the coset level k set by the black hole temperature/horizon scale [1].",
+  "clause_provenance": "re_derived_from_citing_pdf_labeled"
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2604.17270",
+  "citing_version": "v1",
+  "source_id": "2406.13843",
+  "source_version": "v2",
+  "clause": "From a security perspective, GenAI systems are vulnerable to adversarial threats, including data poison- ing [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2102.13551",
+  "citing_version": "v1",
+  "source_id": "1802.00865",
+  "source_version": "v2",
+  "clause": "Regarding the test-\ufb01eld renormalized stress-energy tensors, unfortunately this situa- tion, even if it were to arise in theory, would in practice be unstable to numerical roundo\ufb00error [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2106.13626",
+  "citing_version": "v1",
+  "source_id": "1301.1745",
+  "source_version": "v2",
+  "clause": "and there is a scatter of theoretical and experimental data on the main values of the electronic parameters of polytypes [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2105.00257",
+  "citing_version": "v1",
+  "source_id": "2012.15792",
+  "source_version": "v1",
+  "clause": "lly we identify special diagrams which act as building blocks for several computations of a wide number of observables, con\ufb01rming a pattern already discussed in [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2105.00435",
+  "citing_version": "v1",
+  "source_id": "2102.07419",
+  "source_version": "v2",
+  "clause": "ature has been experimentally recently achieved by the CLAS collaboration at JLab using a 4He gaseous target [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2110.04710",
+  "citing_version": "v1",
+  "source_id": "1712.00080",
+  "source_version": "v2",
+  "clause": "2P+SS baseline with ours and in case the combination in P2P+SS makes the other slow down, we replace our Stage-I method with Pix2PixHD and keep our Stage-II (S2) method unchanged, which makes the comparison between S2 and SS a controlled experiment. \u2022 S1+SS [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2105.07053",
+  "citing_version": "v1",
+  "source_id": "1808.07093",
+  "source_version": "v2",
+  "clause": "INTRODUCTION The study of general relativity on manifolds with boundary is of great importance as these can be used to account for the asymptotics of the gravitational \ufb01eld and the presence of horizons [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2103.00121",
+  "citing_version": "v1",
+  "source_id": "2101.05131",
+  "source_version": "v1",
+  "clause": "xtract powerful features from training data as evidenced by its superior performance compared with DNNs when the number of training data is small [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2106.02585",
+  "citing_version": "v1",
+  "source_id": "1909.08383",
+  "source_version": "v3",
+  "clause": "ately, in empirical comparison, it quickly becomes apparent that assumptions of individual methods are narrow and seem to often be practically tailored towards the limited use case of a particular benchmark [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2110.04212",
+  "citing_version": "v1",
+  "source_id": "0710.1060",
+  "source_version": "v3",
+  "clause": null,
+  "clause_provenance": "re_derived_from_citing_pdf_labeled"
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2104.04704",
+  "citing_version": "v1",
+  "source_id": "1705.07290",
+  "source_version": "v1",
+  "clause": "cacy of this class of model-based deep learning architectures in compressed sensing and sparse- recovery applications [1].",
+  "clause_provenance": "verbatim_from_initial_run"
+ }
+]

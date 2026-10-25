@@ -1,0 +1,222 @@
+[
+ {
+  "cohort": "recent2026",
+  "citing_id": "2609.14310",
+  "citing_version": "v1",
+  "source_id": "2607.20033",
+  "source_version": "v4",
+  "clause": "formulates demonstrations as behavior prompts and learns an in-context visuomotor policy that maps a demonstration and current observation directly to robot actions, while HOST [1].",
+  "clause_provenance": null,
+  "verdict": "PARTIALLY_SUPPORTED",
+  "reasoning": "The claim states that the method formulates demonstrations as behavior prompts and learns an in-context visuomotor policy that maps a demonstration and current observation directly to robot actions. The content describes HOST as a framework that uses a cascade of self-grounded prediction to map demonstrations to robot actions, which aligns with the claim's description of mapping demonstrations to actions. However, the specific term 'in-context visuomotor policy' is not explicitly mentioned, leading to a partial support verdict."
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2601.18824",
+  "citing_version": "v1",
+  "source_id": "2505.23749",
+  "source_version": "v1",
+  "clause": "build on classical pairwise ranking losses such as RankNet, which opti- mize smooth surrogates of ranking quality using logistic link functions Burges et al [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Provisional NOT_SUPPORTED after 4 round(s); 1 cited source(s) not fully reviewed (supporting passage may lie outside the reviewed excerpts). Marked UNVERIFIABLE instead of accusing the claim. Original reasoning: The content provided does not mention RankNet or the optimization of smooth surrogates of ranking quality using logistic link functions. The focus is on distortion in AI alignment and pairwise comparisons using a Bradley-Terry model, but there is no reference to RankNet or similar classical pairwise ranking losses."
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2604.17611",
+  "citing_version": "v1",
+  "source_id": "2601.22516",
+  "source_version": "v1",
+  "clause": "a natural setting for stage-aware classification using repeated clinical assessments rather than relying only on baseline snapshots. In SCOPE-PD [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Provisional NOT_SUPPORTED after 4 round(s); 1 cited source(s) not fully reviewed (supporting passage may lie outside the reviewed excerpts). Marked UNVERIFIABLE instead of accusing the claim. Original reasoning: The content does not mention 'stage-aware classification using repeated clinical assessments' or 'relying only on baseline snapshots' in the context of SCOPE-PD. The study focuses on integrating subjective and objective assessments for Parkinson's disease prediction using machine learning, but it does not specifically discuss stage-aware classification or the use of repeated assessments versus baseline snapshots. Therefore, the claim is not supported by the provided content."
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2604.03908",
+  "citing_version": "v1",
+  "source_id": "2202.05607",
+  "source_version": "v2",
+  "clause": "-ODT proposed for the first time to the best of our knowledge in this paper on top of the main Online Decision Transformer (ODT) work pro- posed in [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content explicitly states that the Online Decision Transformers (ODT) is proposed in this paper, indicating it is a novel contribution. The claim that ODT is proposed for the first time in this paper is directly supported by the text."
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2603.14304",
+  "citing_version": "v1",
+  "source_id": "2506.21132",
+  "source_version": "v2",
+  "clause": "nt noise synthesis procedure driven by sensor noise models to improve low-light denoising. SIED [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the PARTIALLY_SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content describes a synthesis strategy that involves adding a calibrated noise model to generate realistic low-light RAW images, which aligns with the claim about a noise synthesis procedure driven by sensor noise models. However, the specific mention of 'improving low-light denoising' is not directly stated, though it can be inferred that the purpose of such synthesis is to aid in denoising tasks. Thus, the claim is partially supported."
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2607.04333",
+  "citing_version": "v1",
+  "source_id": "2201.02177",
+  "source_version": "v1",
+  "clause": "Grokking \u2014 generalization emerging long after the training set is interpolated \u2014 was first reported by Power et al [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content explicitly states that the phenomenon of 'grokking' involves generalization occurring long after overfitting, which aligns with the claim that grokking is generalization emerging long after the training set is interpolated. The paper by Power et al. is indeed the source reporting this phenomenon."
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2609.14616",
+  "citing_version": "v1",
+  "source_id": "2201.01389",
+  "source_version": "v5",
+  "clause": "INTRODUCTION Semantic communication aims to preserve task-relevant meaning under channel and bandwidth constraints rather than uniformly protecting every source bit [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content explicitly states that semantic communications focus on transmitting necessary information relevant to a specific task, which aligns with the claim that semantic communication aims to preserve task-relevant meaning under constraints rather than uniformly protecting every source bit."
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2604.17061",
+  "citing_version": "v1",
+  "source_id": "2407.18006",
+  "source_version": "v1",
+  "clause": "Standard compendia and surveys record the \u2203R-completeness of homogeneous quadratic feasibility and related degree-two formulations [1].",
+  "clause_provenance": null,
+  "verdict": "PARTIALLY_SUPPORTED",
+  "reasoning": "The content mentions a comprehensive compendium of problems that are complete and hard for \u2203R, which implies that it includes problems like homogeneous quadratic feasibility. However, the document does not explicitly mention 'homogeneous quadratic feasibility' or 'related degree-two formulations'. Therefore, while the document supports the existence of a compendium of \u2203R-complete problems, it does not specifically confirm the inclusion of the mentioned problems."
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2603.07451",
+  "citing_version": "v1",
+  "source_id": "2106.02169",
+  "source_version": "v2",
+  "clause": "un- derscore the same need for precision. Two additional developments sharpen the motivation for such a framework. First, the large-D expansion connects higher-dimensional Euclidean Schwarzschild black holes to an exact two-dimensional worldsheet background: in an appropriate near-horizon scaling limit, the geometry reduces to the SL(2)k/U(1) cigar, with the coset level k set by the black hole temperature/horizon scale [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content explicitly states that the large dimension expansion connects higher-dimensional Schwarzschild black holes to a two-dimensional black hole based on SL(2)k/U(1), which aligns with the claim that in an appropriate near-horizon scaling limit, the geometry reduces to the SL(2)k/U(1) cigar."
+ },
+ {
+  "cohort": "recent2026",
+  "citing_id": "2604.17270",
+  "citing_version": "v1",
+  "source_id": "2406.13843",
+  "source_version": "v2",
+  "clause": "From a security perspective, GenAI systems are vulnerable to adversarial threats, including data poison- ing [1].",
+  "clause_provenance": null,
+  "verdict": "PARTIALLY_SUPPORTED",
+  "reasoning": "The content discusses the potential for GenAI systems to be exploited for malicious purposes and mentions the lack of understanding of specific exploitation tactics. However, it does not explicitly mention 'adversarial threats' or 'data poisoning'. The claim is partially supported as the document addresses the general vulnerability of GenAI systems to misuse, which could include adversarial threats, but does not specifically mention data poisoning."
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2102.13551",
+  "citing_version": "v1",
+  "source_id": "1802.00865",
+  "source_version": "v2",
+  "clause": "Regarding the test-\ufb01eld renormalized stress-energy tensors, unfortunately this situa- tion, even if it were to arise in theory, would in practice be unstable to numerical roundo\ufb00error [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content discusses the instability of certain stress-energy tensor types under numerical perturbations and acknowledges the presence of numerical approximation and round-off issues. This supports the claim that numerical round-off error can lead to instability in practice, even if the situation arises in theory."
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2106.13626",
+  "citing_version": "v1",
+  "source_id": "1301.1745",
+  "source_version": "v2",
+  "clause": "and there is a scatter of theoretical and experimental data on the main values of the electronic parameters of polytypes [1].",
+  "clause_provenance": null,
+  "verdict": "PARTIALLY_SUPPORTED",
+  "reasoning": "The content provides instances where theoretical calculations (PBE and HSE band-gaps) are compared with experimental values, showing discrepancies for some materials like Ge. This supports the claim of a 'scatter of theoretical and experimental data' for electronic parameters, but the content is specific to certain materials and parameters, not all polytypes in general. Thus, the claim is partially supported."
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2105.00257",
+  "citing_version": "v1",
+  "source_id": "2012.15792",
+  "source_version": "v1",
+  "clause": "lly we identify special diagrams which act as building blocks for several computations of a wide number of observables, con\ufb01rming a pattern already discussed in [1].",
+  "clause_provenance": null,
+  "verdict": "PARTIALLY_SUPPORTED",
+  "reasoning": "The content discusses the identification of special observables and their diagrammatic explanation as combinations of simple building blocks. This aligns with the claim about identifying special diagrams as building blocks for computations of observables. However, the content does not explicitly confirm a pattern discussed in another source [1], which limits the support to partial."
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2105.00435",
+  "citing_version": "v1",
+  "source_id": "2102.07419",
+  "source_version": "v2",
+  "clause": "ature has been experimentally recently achieved by the CLAS collaboration at JLab using a 4He gaseous target [1].",
+  "clause_provenance": null,
+  "verdict": "SUPPORTED",
+  "reasoning": "The content explicitly states that the CLAS collaboration at Jefferson Lab conducted experiments using a 4He gaseous target, which aligns with the claim that such a measurement has been experimentally achieved."
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2110.04710",
+  "citing_version": "v1",
+  "source_id": "1712.00080",
+  "source_version": "v2",
+  "clause": "2P+SS baseline with ours and in case the combination in P2P+SS makes the other slow down, we replace our Stage-I method with Pix2PixHD and keep our Stage-II (S2) method unchanged, which makes the comparison between S2 and SS a controlled experiment. \u2022 S1+SS [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Claim text is an extraction fragment (bullet/table shorthand, method-variant designators) with no standalone content assertion; the citation reads as a method-attribution pointer. Abstaining rather than judging - such fragments must never draw an accusation."
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2105.07053",
+  "citing_version": "v1",
+  "source_id": "1808.07093",
+  "source_version": "v2",
+  "clause": "INTRODUCTION The study of general relativity on manifolds with boundary is of great importance as these can be used to account for the asymptotics of the gravitational \ufb01eld and the presence of horizons [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Provisional NOT_SUPPORTED after 4 round(s); 1 cited source(s) not fully reviewed (supporting passage may lie outside the reviewed excerpts). Marked UNVERIFIABLE instead of accusing the claim. Original reasoning: The content provided does not discuss the study of general relativity on manifolds with boundary or its importance in accounting for the asymptotics of the gravitational field and the presence of horizons. The focus is on the structure of the gravitational field at null infinity, the BMS group, and related infrared issues, not on manifolds with boundary or their specific role in general relativity."
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2103.00121",
+  "citing_version": "v1",
+  "source_id": "2101.05131",
+  "source_version": "v1",
+  "clause": "xtract powerful features from training data as evidenced by its superior performance compared with DNNs when the number of training data is small [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content explicitly states that the VoxelHop framework achieves superior classification performance compared to state-of-the-art 3D CNN-based methods, particularly noting its efficiency with fewer parameters and less training time. This supports the claim that VoxelHop extracts powerful features and performs better than DNNs when the number of training data is small."
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2106.02585",
+  "citing_version": "v1",
+  "source_id": "1909.08383",
+  "source_version": "v3",
+  "clause": "ately, in empirical comparison, it quickly becomes apparent that assumptions of individual methods are narrow and seem to often be practically tailored towards the limited use case of a particular benchmark [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Grounding check failed (the evidence quote was not found in the excerpts of the cited source shown to the judge); the PARTIALLY_SUPPORTED verdict is not grounded in the reviewed text of the cited source. Marked UNVERIFIABLE. Original reasoning: The content discusses the lack of consensus on experimental setups and datasets, and notes that methods are often evaluated under specific settings that may not generalize. This aligns with the claim that assumptions of individual methods are narrow and tailored to specific benchmarks. However, the claim's wording about 'empirical comparison' and 'quickly becomes apparent' is not directly stated, hence the partial support."
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2110.04212",
+  "citing_version": "v1",
+  "source_id": "0710.1060",
+  "source_version": "v3",
+  "clause": "th expectation that the planar weak coupling expansion should have a \ufb01nite radius of convergence | \u03bb 4\u03c02 | \u201c 1 with the strong-coupling \u03bb \" 1 asymptotics [1].",
+  "clause_provenance": null,
+  "verdict": "UNVERIFIABLE",
+  "reasoning": "Provisional NOT_SUPPORTED after 4 round(s); 1 cited source(s) not fully reviewed (supporting passage may lie outside the reviewed excerpts). Marked UNVERIFIABLE instead of accusing the claim. Original reasoning: The content provided does not mention the expectation that the planar weak coupling expansion should have a finite radius of convergence or any specific values related to | \u03bb 4\u03c02 | \u201c 1 with the strong-coupling \u03bb \" 1 asymptotics. The document discusses gluon scattering amplitudes, dual conformal symmetry, and the BDS conjecture, but it does not address the specific claim about the convergence of the weak coupling expansion or the asymptotic behavior at strong coupling."
+ },
+ {
+  "cohort": "old2021",
+  "citing_id": "2104.04704",
+  "citing_version": "v1",
+  "source_id": "1705.07290",
+  "source_version": "v1",
+  "clause": "cacy of this class of model-based deep learning architectures in compressed sensing and sparse- recovery applications [1].",
+  "clause_provenance": null,
+  "verdict": "PARTIALLY_SUPPORTED",
+  "reasoning": "The content discusses the efficacy of deep learning architectures inspired by ISTA and FISTA for reconstructing sparse signals from compressive measurements, which aligns with the claim about model-based deep learning architectures in compressed sensing and sparse recovery applications. However, the claim is broader than the specific architectures discussed in the content, which limits the support to partially supported."
+ }
+]
