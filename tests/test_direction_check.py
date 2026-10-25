@@ -73,3 +73,62 @@ def test_guard_applies_per_vote_before_majority(mock_openai):
     mock_openai.next_json = _payload("NOT_SUPPORTED", directions_opposite=False)
     v3, _, _ = vh._judge_claim_once("q", 1)
     assert (v1, v2, v3) == ("CONTRADICTED", "CONTRADICTED", "NOT_SUPPORTED")
+
+
+# ─── Aggregation-layer behavior ──────────────────────────────────────────────
+
+def _queued_payload(verdict, **extra):
+    p = {
+        "verdict": verdict,
+        "confidence": 0.9,
+        "evidence_quote": "online finetuning improves performance",
+        "evidence_start_phrase": "online finetuning improves performance",
+        "reasoning": "mock",
+    }
+    p.update(extra)
+    return json.dumps(p)
+
+
+def _queue_mock(mock_openai, payloads):
+    """Serve queued JSON responses in order across internal llm_calls."""
+    from tests.conftest import _FakeResponse
+    it = iter(payloads)
+
+    def create(model, messages, temperature=None, response_format=None, **kwargs):
+        mock_openai.call_count += 1
+        return _FakeResponse(next(it))
+
+    mock_openai.create = create
+
+
+LONG_CONTENT = ("online finetuning improves performance in this setting. " * 400)
+
+
+def test_aggregation_preserves_direction_guard_contradicted(mock_openai):
+    # Round 1: supportive verdict with opposite flag -> guard makes CONTRADICTED.
+    # Without the aggregation fix, a later complement-round SUPPORTED would
+    # overturn it via strongest-wins.
+    _queue_mock(mock_openai, [
+        _queued_payload("SUPPORTED", directions_opposite=True),   # round 1 vote
+        _queued_payload("SUPPORTED", directions_opposite=False),  # would-be round 2
+    ])
+    result = vh._verify_against_source(
+        "Online finetuning harms decision transformers [1].",
+        "question", "1", "Title", LONG_CONTENT, 1, max_chars=1000)
+    assert result["verdict"] == "CONTRADICTED"
+    assert result["negative_confirmed"] is True
+    assert result["rounds"] == 1  # no recheck once the guard has spoken
+
+
+def test_aggregation_still_upgrades_plain_negative(mock_openai):
+    # A plain CONTRADICTED without the direction flag keeps the old
+    # strongest-wins behavior: a later SUPPORTED round wins.
+    _queue_mock(mock_openai, [
+        _queued_payload("CONTRADICTED"),                          # round 1 vote
+        _queued_payload("SUPPORTED"),                             # round 2 vote
+    ])
+    result = vh._verify_against_source(
+        "Online finetuning harms decision transformers [1].",
+        "question", "1", "Title", LONG_CONTENT, 1, max_chars=1000)
+    assert result["verdict"] == "SUPPORTED"
+    assert result["rounds"] == 2

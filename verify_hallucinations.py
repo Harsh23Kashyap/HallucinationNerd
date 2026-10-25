@@ -843,8 +843,19 @@ def _verify_against_source(claim_text, question, ref_label, title, content, n_vo
 
     gate_on = CONFIG.get("full_source_recheck", True)
     max_rounds = max(1, int(CONFIG.get("max_recheck_rounds", 4)))
+    # A direction-guard CONTRADICTED is a positive finding (the judge identified
+    # the claim's direction as the reverse of shown evidence), not an absence
+    # claim. It is confirmed by the evidence already shown, so it must not be
+    # rechecked for an upgrade nor overturned by a stronger verdict in a later
+    # complement round.
+    def _direction_contradicted(rounds_):
+        return any(
+            v == "CONTRADICTED" and p.get("directions_opposite") is True
+            for v, p, _ in rounds_
+        )
     while (
         gate_on
+        and not _direction_contradicted(rounds)
         and _verdict_rank(rounds[-1][0]) == max(_verdict_rank(r[0]) for r in rounds)
         and rounds[-1][0] in _EVIDENCE_SENSITIVE_NEGATIVES
         and _coverage_fraction(len(content), covered) < _FULL_COVERAGE_THRESHOLD
@@ -860,11 +871,24 @@ def _verify_against_source(claim_text, question, ref_label, title, content, n_vo
         v2, p2, votes2 = _judge_claim_once(_prompt_for(complement), n_votes)
         rounds.append((v2, p2, votes2))
 
-    verdict, payload, votes = max(rounds, key=lambda r: _verdict_rank(r[0]))
+    if _direction_contradicted(rounds):
+        verdict, payload, votes = next(
+            r for r in rounds
+            if r[0] == "CONTRADICTED" and r[1].get("directions_opposite") is True
+        )
+    else:
+        verdict, payload, votes = max(rounds, key=lambda r: _verdict_rank(r[0]))
     coverage = _coverage_fraction(len(content), covered)
     negative_confirmed = False
+    direction_guarded = (
+        verdict == "CONTRADICTED" and payload.get("directions_opposite") is True
+    )
     if verdict in _EVIDENCE_SENSITIVE_NEGATIVES:
-        if coverage >= _FULL_COVERAGE_THRESHOLD or not gate_on:
+        if direction_guarded:
+            # Positive finding of reversed direction in shown evidence; not an
+            # absence claim, so full coverage is not a precondition.
+            negative_confirmed = True
+        elif coverage >= _FULL_COVERAGE_THRESHOLD or not gate_on:
             negative_confirmed = True
         else:
             # Never accuse on partial viewing: the supporting passage may sit
