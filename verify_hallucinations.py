@@ -384,13 +384,16 @@ HOWEVER: If the claim makes a COMPARATIVE statement (e.g., "X is superior/better
 
 When the claim attributes a method, dataset usage, or analysis to me, verify what I actually did — not what I mention. A property of a dataset I describe (e.g., "participants undergo repeated evaluations"), a citation of someone else's method, and work I explicitly defer to the future do not count as things I did. If the claim says I used an approach that I mention only in passing, only as a dataset property, or only as future work, that specific assertion is NOT_SUPPORTED; if my analysis explicitly restricted itself in the opposite direction (e.g., "only baseline data were used"), the claim is CONTRADICTED.
 
+DIRECTION CHECK: Before choosing your verdict, identify the DIRECTION of the claim's core assertion (e.g., "X increases Y", "X outperforms Y", "X causes Y", "method A is better than B", "values rise with Z") and compare it against the direction my content actually states or demonstrates. If my content asserts or demonstrates the OPPOSITE direction (X decreases Y, Y outperforms X, values fall with Z), the claim is CONTRADICTED - never SUPPORTED or PARTIALLY_SUPPORTED, no matter how closely the topic, quantities, or wording otherwise match. A direction match is required for SUPPORTED; a partial-direction mismatch is CONTRADICTED when my content says the reverse.
+
 Return JSON:
 {
     "verdict": "SUPPORTED|PARTIALLY_SUPPORTED|NOT_SUPPORTED|CONTRADICTED|UNVERIFIABLE",
     "confidence": 0.0-1.0,
     "evidence_quote": "the EXACT verbatim quote from my content that supports or contradicts this claim (copy-paste, not paraphrase). Empty if not found.",
     "evidence_start_phrase": "the first 5 words of the evidence quote (for locating it in the document)",
-    "reasoning": "brief explanation of my assessment"
+    "reasoning": "brief explanation of my assessment",
+    "directions_opposite": true or false - true ONLY if the claim's core direction is the reverse of what my content states or demonstrates (false otherwise, including when direction does not apply)
 }'''
 
 
@@ -714,6 +717,20 @@ def _judge_claim_once(user_prompt, n_votes):
                 "evidence_start_phrase": "",
                 "reasoning": "Failed to parse verification response",
             })
+    # Deterministic direction guard: when the judge itself reports that the
+    # claim's direction is the reverse of the source's, a supportive verdict
+    # is internally inconsistent; correct it before any vote counting.
+    for p in passes:
+        if p.get("directions_opposite") is True and p.get("verdict") in (
+            "SUPPORTED",
+            "PARTIALLY_SUPPORTED",
+        ):
+            p["reasoning"] = (
+                "[direction guard] judge reported directions_opposite=true with a "
+                "supportive verdict; overriding to CONTRADICTED. Original reasoning: "
+                + str(p.get("reasoning", ""))
+            )
+            p["verdict"] = "CONTRADICTED"
     votes = [p.get("verdict", "UNVERIFIABLE") for p in passes]
     if n_votes > 1:
         vote_counts = Counter(votes)
