@@ -62,29 +62,38 @@ def candidate_titles(info):
     return [t for t in out if t]
 
 
-def match_uploaded_references(parsed_refs, uploads, head_chars=4000, min_score=0.8):
+def match_uploaded_references(parsed_refs, uploads, head_chars=4000):
     """Map bibliography keys to uploaded text.
 
     parsed_refs: {key: {"title": ..., ...}} from citation_resolver.resolve_references.
     uploads: list of (filename, text).
     Returns (matched {key: text}, matched_names {key: filename}, unmatched [filename]).
     """
-    matched, names, left = {}, {}, []
+    # Resolve proposals before assigning any file: duplicates must not be decided by
+    # upload order, and already-used references must still participate in ambiguity checks.
+    proposals = []
     for fname, text in uploads:
+        key = None
         num = number_from_filename(fname)
-        if num and num in parsed_refs and num not in matched and text:
-            matched[num], names[num] = text, fname
-        else:
-            left.append((fname, text))
-    unmatched = []
-    for fname, text in left:
-        head = _words((text or "")[:head_chars])
-        scores = sorted(((max(_title_score(t, head) for t in candidate_titles(info) or [""]), key)
-                         for key, info in parsed_refs.items() if key not in matched), reverse=True)
-        top = scores[0] if scores else (0.0, None)
-        second = scores[1][0] if len(scores) > 1 else 0.0
-        if text and top[0] >= min_score and top[0] > second:
-            matched[top[1]], names[top[1]] = text, fname
+        if num:
+            if num in parsed_refs and text:
+                key = num
+        elif text:
+            head = _words(text[:head_chars])
+            candidates = [k for k, info in parsed_refs.items()
+                          if any(_title_score(t, head) == 1.0
+                                 for t in candidate_titles(info))]
+            if len(candidates) == 1:
+                key = candidates[0]
+        proposals.append((fname, text, key))
+    counts = {}
+    for _, _, key in proposals:
+        if key is not None:
+            counts[key] = counts.get(key, 0) + 1
+    matched, names, unmatched = {}, {}, []
+    for fname, text, key in proposals:
+        if key is not None and counts[key] == 1:
+            matched[key], names[key] = text, fname
         else:
             unmatched.append(fname)
     return matched, names, unmatched

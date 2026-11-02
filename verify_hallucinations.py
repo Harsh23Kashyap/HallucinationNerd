@@ -297,10 +297,12 @@ def llm_config_error():
 
 def get_client():
     global client
+    problem = llm_config_error()
+    if problem:
+        raise ValueError(problem)
+    if offline_mode() and client is not None and not _is_loopback_url(str(getattr(client, "base_url", ""))):
+        client = None  # a previously cached hosted client must not survive offline activation
     if client is None:
-        problem = llm_config_error()
-        if problem:
-            raise ValueError(problem)
         base = llm_base_url()
         if base:
             client = OpenAI(base_url=base, api_key=os.getenv("HVE_LLM_API_KEY") or "local")
@@ -1017,7 +1019,7 @@ def verify_claim_per_ref(
         nli_short_circuited = False
         try:
             import hve_nli
-            short = hve_nli.maybe_short_circuit(claim_text, source_block)
+            short = None if offline_mode() else hve_nli.maybe_short_circuit(claim_text, source_block)
             if short is not None:
                 verdict_label, conf, _eq = short
                 ref_verdict = verdict_label

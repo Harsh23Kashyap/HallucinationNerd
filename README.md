@@ -89,9 +89,11 @@ In private mode the document's text stays on this computer:
 
 To look nothing up online at all, also set `HVE_OFFLINE=1` and give the tool the cited papers
 yourself. On the web page, add them under "Reference files". Each file is matched to a
-bibliography entry by a number in its name (`3.pdf`, `[3] Smith.pdf`, `ref3.pdf`) or, failing
-that, by finding the entry's title at the start of the file. A reference with no file is
-reported as not checked. Without `HVE_OFFLINE`, uploaded files are used first and the other
+bibliography entry by a number in its name (`3.pdf`, `[3] Smith.pdf`, `ref3.pdf`) or, for an
+unnumbered file, by finding the full entry title at the start of the file. A reference with no file is
+reported as not checked. Duplicate files for one entry and ambiguous titles are left unmatched.
+Offline mode skips the optional NLI pre-filter so it cannot download model weights, and uses
+system fonts on Home and About. Without `HVE_OFFLINE`, uploaded files are used first and the other
 references are fetched online as usual.
 
 A local model can judge claims differently from a hosted one; check it on the benchmark

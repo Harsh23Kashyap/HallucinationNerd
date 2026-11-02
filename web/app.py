@@ -87,7 +87,9 @@ async def home(request: Request):
 @app.get("/about", response_class=HTMLResponse)
 async def about(request: Request):
     """Serve the About page."""
-    return templates.TemplateResponse(request=request, name="about.html")
+    from verify_hallucinations import offline_mode
+    return templates.TemplateResponse(request=request, name="about.html",
+                                      context={"offline_mode": offline_mode()})
 
 
 @app.post("/verify")

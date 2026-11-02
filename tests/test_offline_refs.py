@@ -37,15 +37,14 @@ REFS = {"1": {"title": "Attention is all you need"},
 def test_match_by_number_then_by_title():
     matched, names, unmatched = match_uploaded_references(
         REFS, [("1.pdf", "x"), ("paper.pdf", "Attention Is All You Need\nAbstract ...")])
-    assert names == {"1": "1.pdf"} and unmatched == ["paper.pdf"]  # ref 1 already taken by number
+    assert names == {} and unmatched == ["1.pdf", "paper.pdf"]  # duplicate proposals are ambiguous
     matched, names, unmatched = match_uploaded_references(
         REFS, [("paper.pdf", "Attention Is All You Need\nAbstract ...")])
     assert names == {"1": "paper.pdf"} and unmatched == []
 
 
 def test_ambiguous_title_is_not_guessed():
-    # "deep residual learning for image recognition" fully matches ref 2, and is also the start
-    # of ref 3's title; ref 2 scores 1.0, ref 3 scores lower, so ref 2 is chosen
+    # A complete title matches; a prefix of the longer title is not a full match.
     m, names, un = match_uploaded_references(REFS, [("he.pdf", "Deep Residual Learning for Image Recognition")])
     assert names == {"2": "he.pdf"}
     # a file whose text matches no title is left unmatched
@@ -111,3 +110,63 @@ def test_short_form_reference_is_matched_by_its_title():
         {str(k): v for k, v in refs.items()},
         [("vaswani.pdf", "Some licence line.\nAttention Is All You Need\nAshish Vaswani")])
     assert names == {"1": "vaswani.pdf"}
+
+
+def test_partial_title_is_not_a_match():
+    _, names, unmatched = match_uploaded_references(
+        {"1": {"title": "Deep residual learning for image recognition"}},
+        [("wrong.txt", "Deep residual learning for image classification")])
+    assert names == {} and unmatched == ["wrong.txt"]
+
+
+def test_duplicate_numbers_are_not_order_dependent():
+    uploads = [("1.txt", "paper A"), ("ref1.txt", "paper B")]
+    for order in (uploads, uploads[::-1]):
+        matched, names, unmatched = match_uploaded_references(REFS, order)
+        assert matched == {} and names == {} and len(unmatched) == 2
+
+
+def test_shared_complete_title_is_ambiguous():
+    refs = {"1": {"title": "Deep residual learning"},
+            "2": {"title": "Deep residual learning for image recognition"}}
+    assert match_uploaded_references(refs, [("paper.txt", "Deep residual learning for image recognition")])[0] == {}
+
+
+def test_numbered_file_is_not_reassigned_by_title():
+    assert match_uploaded_references(REFS, [("99.txt", REF1)])[0] == {}
+
+
+def test_offline_skips_optional_nli(web_app, tmp_path, monkeypatch):
+    import hve_nli
+    monkeypatch.setenv("HVE_OFFLINE", "1")
+    monkeypatch.setenv("HVE_NLI_ENABLED", "1")
+    monkeypatch.setattr(hve_nli, "maybe_short_circuit", lambda *a: pytest.fail("NLI might download weights"))
+    _run(web_app, tmp_path, [("1.txt", REF1)])
+
+
+def test_offline_home_has_no_remote_fonts(web_app, monkeypatch):
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("HVE_OFFLINE", "1")
+    for path in ("/", "/about"):
+        page = TestClient(web_app.app).get(path)
+        assert page.status_code == 200
+        assert "fonts.googleapis.com" not in page.text
+        assert "fonts.gstatic.com" not in page.text
+
+
+def test_cached_client_cannot_bypass_offline_config(monkeypatch):
+    monkeypatch.setattr(vh, "client", object())
+    monkeypatch.setenv("HVE_OFFLINE", "1")
+    monkeypatch.setenv("HVE_LLM_BASE_URL", "https://example.org/v1")
+    with pytest.raises(ValueError, match="Private mode"):
+        vh.get_client()
+
+
+def test_cached_remote_client_is_replaced_in_offline_mode(monkeypatch):
+    from types import SimpleNamespace
+    monkeypatch.setattr(vh, "client", SimpleNamespace(base_url="https://api.openai.com/v1"))
+    monkeypatch.setenv("HVE_OFFLINE", "1")
+    monkeypatch.setenv("HVE_LLM_BASE_URL", "http://127.0.0.1:11434/v1")
+    monkeypatch.setenv("VERIFICATION_MODEL", "test-local")
+    local = vh.get_client()
+    assert str(local.base_url).startswith("http://127.0.0.1:11434/")
