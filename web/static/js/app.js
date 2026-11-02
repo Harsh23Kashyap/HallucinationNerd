@@ -100,7 +100,8 @@ async function runVerification(patientWait) {
     formData.append('source_type', document.getElementById('sourceType').value);
     const selectedDbs = [...document.querySelectorAll('.dbCheck:checked')].map(c => c.value);
     formData.append('databases', selectedDbs.join(','));
-    formData.append('custom_database', document.getElementById('customDatabase').value.trim());
+    const customDb = document.getElementById('customDatabase');  // absent in private mode
+    formData.append('custom_database', customDb ? customDb.value.trim() : '');
     formData.append('patient_wait', patientWait ? 'true' : 'false');
 
     try {

@@ -54,10 +54,39 @@ Optional, for PDF and web-page source support:
 pip install pymupdf beautifulsoup4 requests
 ```
 
-Requires an OpenAI API key in `.env`:
+By default it uses OpenAI, with an API key in `.env`:
 ```
 OPENAI_API_KEY=your-key-here
 ```
+
+### Running privately, with a model on your own computer
+
+Any OpenAI-compatible server works. With [Ollama](https://ollama.com):
+
+```bash
+ollama pull qwen2.5:14b
+OLLAMA_HOST=127.0.0.1:11434 ollama serve
+```
+
+Then set, in `.env` or the environment:
+```
+HVE_PRIVATE=1
+HVE_LLM_BASE_URL=http://127.0.0.1:11434/v1
+VERIFICATION_MODEL=qwen2.5:14b
+```
+
+In private mode the document's text stays on this computer:
+
+- The model must run on this computer. A model address that is not local (127.0.0.1,
+  ::1 or localhost) is refused, and no OpenAI key is needed.
+- Backup search for uncited claims is off, because its query is the claim itself. The web
+  page hides that option and the server refuses it.
+- Cited references are still looked up online (arXiv, Semantic Scholar, OpenAlex, PubMed,
+  Unpaywall, doi.org) to fetch their text. Only each reference's ID or title is sent, which
+  is public information, not the document's text.
+
+A local model can judge claims differently from a hosted one; check it on the benchmark
+below before relying on it.
 
 ## Usage
 

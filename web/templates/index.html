@@ -49,6 +49,12 @@
                     </div>
                 </div>
 
+{% if private_mode %}
+                <div class="form-section">
+                    <span class="section-label"><span class="num">02</span> Backup search</span>
+                    <p class="section-hint">Private mode is on: the model runs on this computer and backup database search is off, so the document's claims are never sent online.</p>
+                </div>
+{% else %}
                 <div class="form-section">
                     <span class="section-label"><span class="num">02</span> Backup search</span>
                     <p class="section-hint">For claims with no inline citation, look for supporting evidence in these databases.</p>
@@ -72,6 +78,7 @@
                     <input type="text" id="customDatabase" name="custom_database"
                         placeholder="Add your own: search-URL with {query}">
                 </div>
+{% endif %}
 
                 <div class="form-section">
                     <span class="section-label"><span class="num">03</span> Upload document</span>

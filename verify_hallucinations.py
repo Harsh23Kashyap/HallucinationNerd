@@ -247,15 +247,59 @@ class EvalVerification:
 
 client = None
 
+# Local model support. HVE_LLM_BASE_URL points the engine at any OpenAI-compatible server,
+# for example Ollama on this computer: http://127.0.0.1:11434/v1. HVE_PRIVATE=1 turns on
+# private mode: the model must run on this computer, and claim text is never sent to an
+# online search. Reference lookups (arXiv, PubMed, ...) send only the reference's ID or title.
+
+def llm_base_url():
+    """The OpenAI-compatible server to use, or None for OpenAI itself."""
+    return os.getenv("HVE_LLM_BASE_URL", "").strip() or None
+
+
+def private_mode() -> bool:
+    return os.getenv("HVE_PRIVATE", "").strip().lower() in ("1", "true", "yes")
+
+
+def _is_loopback_url(url) -> bool:
+    """True when the URL's host is this computer (127.0.0.0/8, ::1 or localhost)."""
+    import ipaddress
+    from urllib.parse import urlparse
+    host = (urlparse(url or "").hostname or "").lower()
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def llm_config_error():
+    """Why the model settings cannot be used, or None when they are fine."""
+    base = llm_base_url()
+    if private_mode() and not (base and _is_loopback_url(base)):
+        return ("Private mode needs a model on this computer: set HVE_LLM_BASE_URL to a local "
+                "server, for example http://127.0.0.1:11434/v1")
+    if base:
+        if not os.getenv("VERIFICATION_MODEL"):
+            return "Set VERIFICATION_MODEL to the local model's name, for example qwen2.5:14b"
+        return None
+    if not os.getenv("OPENAI_API_KEY"):
+        return "OPENAI_API_KEY not set. Create a .env file or export it."
+    return None
+
+
 def get_client():
     global client
     if client is None:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "OPENAI_API_KEY not set. Create a .env file or export it."
-            )
-        client = OpenAI(api_key=api_key)
+        problem = llm_config_error()
+        if problem:
+            raise ValueError(problem)
+        base = llm_base_url()
+        if base:
+            client = OpenAI(base_url=base, api_key=os.getenv("HVE_LLM_API_KEY") or "local")
+        else:
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     return client
 
 
@@ -265,7 +309,7 @@ def llm_call(system_prompt: str, user_prompt: str, response_format=None) -> str:
     for attempt in range(CONFIG["max_retries"]):
         try:
             kwargs = {
-                "model": CONFIG["model"],
+                "model": os.getenv("VERIFICATION_MODEL") or CONFIG["model"],
                 "temperature": CONFIG["temperature"],
                 "messages": [
                     {"role": "system", "content": system_prompt},
@@ -275,7 +319,8 @@ def llm_call(system_prompt: str, user_prompt: str, response_format=None) -> str:
             if response_format:
                 kwargs["response_format"] = response_format
             response = c.chat.completions.create(**kwargs)
-            time.sleep(CONFIG["rate_limit_delay"])
+            if not _is_loopback_url(llm_base_url()):
+                time.sleep(CONFIG["rate_limit_delay"])  # rate limit applies to hosted APIs only
             return response.choices[0].message.content
         except Exception as e:
             if attempt < CONFIG["max_retries"] - 1:
@@ -505,6 +550,14 @@ def _search_backup_reference(claim_text: str, question: str, question_id: str, c
         - SUPPORTED + the found reference as evidence
         - NOT_SUPPORTED if searched but no backup found
     """
+    if private_mode():
+        # the query below is the claim itself, i.e. the paper's own text: never send it out
+        return ClaimVerification(
+            question_id=question_id, claim_id=f"{question_id}-C{claim_idx}",
+            claim_text=claim_text, cited_refs=[], verdict="UNVERIFIABLE", confidence=0.5,
+            evidence_quote="", evidence_reference="", evidence_span_start=-1, evidence_span_end=-1,
+            reasoning="Private mode: the claim text is not sent to an online search.",
+        )
     # Generate a search query from the claim
     search_query = claim_text[:200]  # Use the claim itself as the query
     

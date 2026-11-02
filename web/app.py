@@ -78,7 +78,9 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Serve the main page."""
-    return templates.TemplateResponse(request=request, name="index.html")
+    from verify_hallucinations import private_mode
+    return templates.TemplateResponse(request=request, name="index.html",
+                                      context={"private_mode": private_mode()})
 
 
 @app.get("/about", response_class=HTMLResponse)
@@ -103,8 +105,15 @@ async def verify_document(
     `custom_database` search-URL template containing '{query}').
     Returns JSON with per-claim results.
     """
-    if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(status_code=500, detail="Server misconfigured: no API key")
+    from verify_hallucinations import llm_config_error, private_mode
+    problem = llm_config_error()
+    if problem:
+        raise HTTPException(status_code=500, detail=f"Server misconfigured: {problem}")
+    if private_mode() and (databases.strip() or custom_database.strip()):
+        # backup search sends the claim text itself to the chosen databases
+        raise HTTPException(status_code=400, detail=(
+            "Private mode is on, so backup database search is turned off: it would send "
+            "the document's claims to online databases."))
 
     # M19: per-IP rate limit. Reject with 429 if the caller has burned
     # through their budget in the current window.
