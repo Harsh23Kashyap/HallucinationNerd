@@ -103,6 +103,8 @@ async function runVerification(patientWait) {
     const customDb = document.getElementById('customDatabase');  // absent in private mode
     formData.append('custom_database', customDb ? customDb.value.trim() : '');
     formData.append('patient_wait', patientWait ? 'true' : 'false');
+    const refInput = document.getElementById('refInput');
+    if (refInput) [...refInput.files].forEach(f => formData.append('references', f));
 
     try {
         const response = await fetch('/verify', { method: 'POST', body: formData });
@@ -132,6 +134,23 @@ function showError(msg) {
     document.getElementById('errorMsg').textContent = msg;
 }
 
+function renderReferenceNotice(rf) {
+    // Which uploaded reference files were used; built with textContent (file names are user input).
+    const box = document.getElementById('refNotice');
+    if (!box) return;
+    const parts = [];
+    if (rf) {
+        const used = Object.keys(rf.matched || {});
+        if (used.length) parts.push(`Used your files for reference ${used.join(', ')}.`);
+        if ((rf.unmatched || []).length) parts.push(`Could not match: ${rf.unmatched.join(', ')}.`);
+        if (rf.offline) parts.push((rf.not_supplied || []).length
+            ? `Offline mode: no file for reference ${rf.not_supplied.join(', ')}, so those were not checked.`
+            : 'Offline mode: nothing was looked up online.');
+    }
+    box.textContent = parts.join(' ');
+    box.classList.toggle('hidden', parts.length === 0);
+}
+
 function renderResults(data) {
     const s = data.summary;
     currentReport = data;
@@ -157,6 +176,8 @@ function renderResults(data) {
     document.getElementById('vcContradicted').textContent = s.contradicted || 0;
     document.getElementById('vcNotFound').textContent = s.citation_not_found || 0;
     document.getElementById('vcNoAccess').textContent = (s.inaccessible || 0) + (s.unverifiable || 0);
+
+    renderReferenceNotice(data.reference_files);
 
     // Show detailed claims header
     document.getElementById('detailsHeader').style.display = 'block';

@@ -100,7 +100,7 @@ def parse_reference(article: dict) -> str:
     
     # Try fetching from URL
     url = article.get("url", "")
-    if url and url.startswith("http"):
+    if url and url.startswith("http") and not offline_mode():
         return _fetch_url(url)
     
     # Fallback: use abstract or summary
@@ -261,6 +261,12 @@ def private_mode() -> bool:
     return os.getenv("HVE_PRIVATE", "").strip().lower() in ("1", "true", "yes")
 
 
+def offline_mode() -> bool:
+    """HVE_OFFLINE=1: nothing is looked up online. References must be supplied as files or
+    text; a reference without one cannot be checked. Implies the private-mode rules too."""
+    return os.getenv("HVE_OFFLINE", "").strip().lower() in ("1", "true", "yes")
+
+
 def _is_loopback_url(url) -> bool:
     """True when the URL's host is this computer (127.0.0.0/8, ::1 or localhost)."""
     import ipaddress
@@ -277,7 +283,7 @@ def _is_loopback_url(url) -> bool:
 def llm_config_error():
     """Why the model settings cannot be used, or None when they are fine."""
     base = llm_base_url()
-    if private_mode() and not (base and _is_loopback_url(base)):
+    if (private_mode() or offline_mode()) and not (base and _is_loopback_url(base)):
         return ("Private mode needs a model on this computer: set HVE_LLM_BASE_URL to a local "
                 "server, for example http://127.0.0.1:11434/v1")
     if base:
@@ -550,7 +556,7 @@ def _search_backup_reference(claim_text: str, question: str, question_id: str, c
         - SUPPORTED + the found reference as evidence
         - NOT_SUPPORTED if searched but no backup found
     """
-    if private_mode():
+    if private_mode() or offline_mode():
         # the query below is the claim itself, i.e. the paper's own text: never send it out
         return ClaimVerification(
             question_id=question_id, claim_id=f"{question_id}-C{claim_idx}",

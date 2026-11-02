@@ -11,7 +11,7 @@ import tempfile
 import hashlib
 import re
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import FastAPI, File, UploadFile, Form, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -78,9 +78,10 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Serve the main page."""
-    from verify_hallucinations import private_mode
+    from verify_hallucinations import private_mode, offline_mode
     return templates.TemplateResponse(request=request, name="index.html",
-                                      context={"private_mode": private_mode()})
+                                      context={"private_mode": private_mode() or offline_mode(),
+                                               "offline_mode": offline_mode()})
 
 
 @app.get("/about", response_class=HTMLResponse)
@@ -97,19 +98,22 @@ async def verify_document(
     databases: str = Form(default=""),
     custom_database: str = Form(default=""),
     patient_wait: bool = Form(default=False),
+    references: List[UploadFile] = File(default=[]),
 ):
     """
     Accept a document upload, extract claims + citations, verify each one.
+    `references` are optional files of the cited papers; they are matched to the bibliography
+    and used instead of fetching those papers online (with HVE_OFFLINE=1, nothing is fetched).
     For claims with no inline citation, optionally run a backup search over the
     user-selected databases (comma-separated keys in `databases`, plus an optional
     `custom_database` search-URL template containing '{query}').
     Returns JSON with per-claim results.
     """
-    from verify_hallucinations import llm_config_error, private_mode
+    from verify_hallucinations import llm_config_error, private_mode, offline_mode
     problem = llm_config_error()
     if problem:
         raise HTTPException(status_code=500, detail=f"Server misconfigured: {problem}")
-    if private_mode() and (databases.strip() or custom_database.strip()):
+    if (private_mode() or offline_mode()) and (databases.strip() or custom_database.strip()):
         # backup search sends the claim text itself to the chosen databases
         raise HTTPException(status_code=400, detail=(
             "Private mode is on, so backup database search is turned off: it would send "
@@ -135,6 +139,16 @@ async def verify_document(
     filename = file.filename or "uploaded_file"
     suffix = Path(filename).suffix.lower()
 
+    uploaded_refs = []
+    total = len(content_bytes)
+    for ref in references or []:
+        data = await ref.read()
+        total += len(data)
+        if total > max_bytes * 4:
+            raise HTTPException(status_code=413, detail="Reference files are too large in total")
+        if data:
+            uploaded_refs.append((ref.filename or "reference", _reference_text(ref.filename or "", data)))
+
     # Save to temp file for processing
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content_bytes)
@@ -143,7 +157,8 @@ async def verify_document(
     db_list = [d.strip() for d in databases.split(",") if d.strip()]
     try:
         results = await asyncio.to_thread(
-            _run_verification, tmp_path, filename, suffix, source_type, db_list, custom_database.strip(), patient_wait
+            _run_verification, tmp_path, filename, suffix, source_type, db_list, custom_database.strip(), patient_wait,
+            uploaded_refs,
         )
         return JSONResponse(content=results)
     except Exception as e:
@@ -240,9 +255,23 @@ def _extract_citation_rich_sections(text: str, max_chars: int = 12000) -> str:
     return text[:max_chars]
 
 
+def _reference_text(name: str, data: bytes) -> str:
+    """Text of an uploaded reference file: PDFs through PyMuPDF, anything else as text."""
+    if name.lower().endswith(".pdf"):
+        from verify_hallucinations import _parse_pdf
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(data)
+            path = tmp.name
+        try:
+            return _parse_pdf(path)
+        finally:
+            os.unlink(path)
+    return data.decode("utf-8", errors="ignore")
+
+
 def _run_verification(file_path: str, filename: str, suffix: str, source_type: str,
                       databases: list = None, custom_database: str = "",
-                      patient_wait: bool = False) -> dict:
+                      patient_wait: bool = False, uploaded_refs: list = None) -> dict:
     """
     Run the HallucinationNerd pipeline on the uploaded file.
     This runs in a thread to not block the event loop.
@@ -320,23 +349,34 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
 
     # Resolve all citations at once (fetches from arXiv, DOI, PubMed, URLs)
     # Use FULL text here (not trimmed) since References section is at the end
+    from verify_hallucinations import offline_mode
+    from local_references import match_uploaded_references
     resolved_sources = {}
     parsed_refs = {}
     parsed_ref_keys = set()
+    reference_files = {"offline": offline_mode(), "matched": {}, "unmatched": []}
     if all_cited:
-        if patient_wait:
-            resolved_sources = resolve_and_fetch_all(text, list(all_cited), patient=True)
-        else:
-            resolved_sources = resolve_and_fetch_all(text, list(all_cited))
         # Parsed bibliography keys: lets us distinguish a citation that doesn't
         # resolve to any bibliography entry ("cited article doesn't exist") from
         # one that is in the bibliography but whose content couldn't be fetched
-        # ("could not access").
+        # ("could not access"). Parsing reads only the document itself.
         try:
             parsed_refs = resolve_references(text)
             parsed_ref_keys = {str(k) for k in parsed_refs}
         except Exception:
             parsed_ref_keys = set()
+        local, names, unmatched = match_uploaded_references(
+            {str(k): v for k, v in parsed_refs.items()}, uploaded_refs or [])
+        reference_files["matched"], reference_files["unmatched"] = names, unmatched
+        to_fetch = [r for r in all_cited if r not in local]
+        if to_fetch and not offline_mode():
+            if patient_wait:
+                resolved_sources = resolve_and_fetch_all(text, to_fetch, patient=True)
+            else:
+                resolved_sources = resolve_and_fetch_all(text, to_fetch)
+        resolved_sources.update(local)
+        if offline_mode():
+            reference_files["not_supplied"] = sorted(to_fetch, key=lambda k: (not k.isdigit(), int(k) if k.isdigit() else 0, k))
     # For numbered bibliographies, the largest real reference number bounds what
     # can be a citation; bracketed values above it (e.g. "656 s [648, 661]" IQRs)
     # are statistics, not citations.
@@ -538,6 +578,7 @@ def _run_verification(file_path: str, filename: str, suffix: str, source_type: s
 
     return {
         "filename": filename,
+        "reference_files": reference_files,
         "summary": {
             "total_claims": total,
             "supported": supported,

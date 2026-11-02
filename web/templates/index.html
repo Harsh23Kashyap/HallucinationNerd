@@ -92,6 +92,16 @@
                     </div>
                 </div>
 
+                <div class="form-section">
+                    <span class="section-label"><span class="num">04</span> Reference files (optional)</span>
+                    {% if offline_mode %}
+                    <p class="section-hint">Offline mode is on: nothing is looked up online. Add the cited papers here; a reference without a file cannot be checked.</p>
+                    {% else %}
+                    <p class="section-hint">Add the cited papers to check them without fetching them online. Name a file by its reference number (for example 3.pdf) or it is matched by title.</p>
+                    {% endif %}
+                    <input type="file" id="refInput" name="references" multiple accept=".pdf,.txt,.md">
+                </div>
+
                 <button type="submit" id="submitBtn" class="submit-btn">
                     Verify Citations <span class="arrow">-&gt;</span>
                 </button>
@@ -167,6 +177,7 @@
                 </div>
             </div>
 
+            <div id="refNotice" class="sample-notice hidden" role="status"></div>
             <div id="sampleNotice" class="sample-notice hidden" role="status">Sample report - illustrative results, not a live verification. Upload your own document to run an analysis.</div>
             <div id="reviewTools" class="review-tools hidden">
                 <div class="review-actions">
