@@ -170,3 +170,9 @@ def test_cached_remote_client_is_replaced_in_offline_mode(monkeypatch):
     monkeypatch.setenv("VERIFICATION_MODEL", "test-local")
     local = vh.get_client()
     assert str(local.base_url).startswith("http://127.0.0.1:11434/")
+
+
+def test_pdf_ligatures_do_not_block_a_title_match():
+    refs = {"1": {"title": "EfficientNet: Rethinking model scaling for convolutional neural networks"}}
+    text = "Ef\ufb01cientNet: Rethinking Model Scaling for Convolutional Neural Networks\nMingxing Tan"
+    assert match_uploaded_references(refs, [("tan.pdf", text)])[1] == {"1": "tan.pdf"}

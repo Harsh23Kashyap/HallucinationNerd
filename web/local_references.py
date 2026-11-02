@@ -12,6 +12,7 @@ A match is only made when it is unambiguous. Files that match nothing are report
 guessed.
 """
 import re
+import unicodedata
 
 _NAME_NUMBER = re.compile(r"^\s*(?:\[\s*(\d+)\s*\]|(?:ref(?:erence)?[\s_\-]*)?(\d+))(?=\D|$)", re.I)
 _WORD = re.compile(r"[a-z0-9]+")
@@ -19,7 +20,9 @@ _STOP = {"a", "an", "the", "of", "for", "and", "in", "on", "to", "with", "by", "
 
 
 def _words(text):
-    return [w for w in _WORD.findall((text or "").lower()) if w not in _STOP]
+    # NFKC turns PDF ligatures ("ﬁ" in "Eﬃcient") back into plain letters before comparing
+    text = unicodedata.normalize("NFKC", text or "")
+    return [w for w in _WORD.findall(text.lower()) if w not in _STOP]
 
 
 def number_from_filename(name):
