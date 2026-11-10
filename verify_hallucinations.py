@@ -300,8 +300,8 @@ def get_client():
     problem = llm_config_error()
     if problem:
         raise ValueError(problem)
-    if offline_mode() and client is not None and not _is_loopback_url(str(getattr(client, "base_url", ""))):
-        client = None  # a previously cached hosted client must not survive offline activation
+    if (private_mode() or offline_mode()) and client is not None and not _is_loopback_url(str(getattr(client, "base_url", ""))):
+        client = None  # a cached hosted client must not survive private or offline activation
     if client is None:
         base = llm_base_url()
         if base:
