@@ -937,6 +937,18 @@ def _make_cache_key(ref_info: dict, ref_key: str) -> str:
     return f"raw:{ref_key}"
 
 
+def _fetch_cache_key(ref_info: dict, ref_key: str):
+    """Scope cached content to every input that can select a fetch fallback.
+
+    A canonical identifier can fail and return content from URL/title/raw instead.
+    Sharing that success solely by identifier can give another reference the wrong
+    fallback content. Keep the legacy identifier-key helper policy unchanged.
+    """
+    fields = ("arxiv_id", "doi", "url", "pmid", "title", "raw")
+    return (_make_cache_key(ref_info, ref_key),
+            tuple(ref_info.get(field) or "" for field in fields))
+
+
 def _search_pubmed(query: str) -> Optional[str]:
     """Search PubMed by query and return the top hit's abstract (backup search)."""
     try:
@@ -1034,7 +1046,7 @@ def resolve_and_fetch_all(full_text: str, cited_refs: list, patient: bool = Fals
     for ref_key in cited_refs:
         ref_key_str = str(ref_key)
         ref_info = refs.get(ref_key_str, {})
-        cache_key = _make_cache_key(ref_info, ref_key_str)
+        cache_key = _fetch_cache_key(ref_info, ref_key_str)
         cached = _source_cache.get(cache_key)
         if cached is not None:
             _, content = cached
@@ -1050,7 +1062,7 @@ def resolve_and_fetch_all(full_text: str, cited_refs: list, patient: bool = Fals
                 for k in (prefix, prefix + "a", prefix + "b", prefix + "~2"):
                     if k in refs:
                         ref_info = refs[k]
-                        cache_key = _make_cache_key(ref_info, k)
+                        cache_key = _fetch_cache_key(ref_info, k)
                         break
         if ref_info is not None:
             to_fetch.append((ref_key_str, ref_info, cache_key))
