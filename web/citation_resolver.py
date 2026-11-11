@@ -14,6 +14,7 @@ import re
 import os
 import time
 import hashlib
+import math
 import requests
 import threading
 from typing import Optional
@@ -57,6 +58,8 @@ def _retry_delay(response, attempt: int) -> float:
         retry_after = (getattr(response, "headers", {}) or {}).get("Retry-After", "")
     try:
         delay = float(retry_after)
+        if not math.isfinite(delay):
+            raise ValueError("Retry-After must be finite")
     except (TypeError, ValueError):
         delay = 0.6 * (2 ** attempt)
     return min(max(delay, 0.0), _MAX_RETRY_DELAY_SECONDS)
