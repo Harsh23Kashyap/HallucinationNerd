@@ -32,6 +32,7 @@ _S2_API_KEY = os.getenv("SEMANTIC_SCHOLAR_API_KEY", "")
 # responses don't stick forever.
 import time as _time
 _source_cache: dict = {}  # cache_key -> (timestamp, content)
+_source_cache_lock = threading.Lock()
 _CACHE_TTL_SECONDS = 3600  # 1 hour default; override with HVE_CACHE_TTL
 
 
@@ -1040,14 +1041,16 @@ def resolve_and_fetch_all(full_text: str, cited_refs: list, patient: bool = Fals
     ttl = int(os.getenv("HVE_CACHE_TTL", str(_CACHE_TTL_SECONDS)))
     now = _time.time()
     # Garbage-collect expired entries
-    for k in [k for k, v in _source_cache.items() if now - v[0] > ttl]:
-        _source_cache.pop(k, None)
+    with _source_cache_lock:
+        for k in [k for k, v in _source_cache.items() if now - v[0] > ttl]:
+            _source_cache.pop(k, None)
 
     for ref_key in cited_refs:
         ref_key_str = str(ref_key)
         ref_info = refs.get(ref_key_str, {})
         cache_key = _fetch_cache_key(ref_info, ref_key_str)
-        cached = _source_cache.get(cache_key)
+        with _source_cache_lock:
+            cached = _source_cache.get(cache_key)
         if cached is not None:
             _, content = cached
             results[ref_key_str] = content
@@ -1098,7 +1101,8 @@ def resolve_and_fetch_all(full_text: str, cited_refs: list, patient: bool = Fals
                             throttled_refs.append(ref_key_str)
                         # Never cache a transient failure, including a shared one.
                         if content:
-                            _source_cache[cache_key] = (now, content)
+                            with _source_cache_lock:
+                                _source_cache[cache_key] = (now, content)
                 except Exception:
                     for ref_key_str, _ in aliases:
                         results[ref_key_str] = None
