@@ -919,8 +919,8 @@ def _make_cache_key(ref_info: dict, ref_key: str) -> str:
     whenever two references had the same opening — common for repeated
     author names, long titles getting truncated the same way, etc.
 
-    New key: prefer canonical identifiers (arxiv_id > doi > pmid > title).
-    Falls back to a hash of (title + arxiv_id + doi) for the long tail.
+    Prefer identifiers in fetch order (arxiv_id > doi > URL > pmid > title).
+    Direct URLs are trimmed but retain path case and query parameters.
     """
     arxiv = (ref_info.get("arxiv_id") or "").strip().lower()
     if arxiv:
@@ -928,12 +928,14 @@ def _make_cache_key(ref_info: dict, ref_key: str) -> str:
     doi = (ref_info.get("doi") or "").strip().lower()
     if doi:
         return f"doi:{doi}"
+    url = (ref_info.get("url") or "").strip()
+    if url:
+        return "url:" + hashlib.sha256(url.encode("utf-8", errors="ignore")).hexdigest()[:16]
     pmid = (ref_info.get("pmid") or "").strip()
     if pmid:
         return f"pmid:{pmid}"
     title = (ref_info.get("title") or ref_info.get("raw") or ref_key).strip().lower()
     if title:
-        import hashlib
         return "title:" + hashlib.sha256(title.encode("utf-8", errors="ignore")).hexdigest()[:16]
     return f"raw:{ref_key}"
 
