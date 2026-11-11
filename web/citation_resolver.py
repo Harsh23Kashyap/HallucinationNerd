@@ -1061,24 +1061,34 @@ def resolve_and_fetch_all(full_text: str, cited_refs: list, patient: bool = Fals
     throttled_refs = []
     if to_fetch:
         with ThreadPoolExecutor(max_workers=5) as executor:
-            future_to_ref = {}
+            future_to_refs = {}
+            # Equality of complete fetch inputs, not only cache keys. The same
+            # DOI can have different URL/title fallbacks; do not collapse those.
+            groups = []
             for ref_key_str, ref_info, cache_key in to_fetch:
+                for existing_info, aliases in groups:
+                    if ref_info == existing_info:
+                        aliases.append((ref_key_str, cache_key))
+                        break
+                else:
+                    groups.append((ref_info, [(ref_key_str, cache_key)]))
+            for ref_info, aliases in groups:
                 future = executor.submit(_fetch_with_policy, ref_info, patient)
-                future_to_ref[future] = (ref_key_str, cache_key)
+                future_to_refs[future] = aliases
 
-            for future in as_completed(future_to_ref):
-                ref_key_str, cache_key = future_to_ref[future]
+            for future in as_completed(future_to_refs):
+                aliases = future_to_refs[future]
                 try:
                     content, throttled = future.result()
-                    results[ref_key_str] = content
-                    if throttled:
-                        throttled_refs.append(ref_key_str)
-                    # Cache ONLY successful fetches. Caching None poisons the
-                    # cache: a single transient failure (e.g. arXiv rate-limit)
-                    # would otherwise stick for the whole TTL and never retry.
-                    if content:
-                        _source_cache[cache_key] = (now, content)
+                    for ref_key_str, cache_key in aliases:
+                        results[ref_key_str] = content
+                        if throttled and ref_key_str not in throttled_refs:
+                            throttled_refs.append(ref_key_str)
+                        # Never cache a transient failure, including a shared one.
+                        if content:
+                            _source_cache[cache_key] = (now, content)
                 except Exception:
-                    results[ref_key_str] = None
+                    for ref_key_str, _ in aliases:
+                        results[ref_key_str] = None
 
     return ResolutionResult(results, throttled_refs=throttled_refs)
