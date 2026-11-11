@@ -32,7 +32,7 @@ def test_openalex_rejects_mismatched_title(monkeypatch):
     monkeypatch.setattr(cr, "_rate_limit", lambda: None)
     fetched = []
     monkeypatch.setattr(cr, "_fetch_arxiv", lambda aid: fetched.append(aid) or "text")
-    monkeypatch.setattr(cr.requests, "get", lambda url, **kw: _Resp(
+    monkeypatch.setattr(cr, "public_get", lambda url, **kw: _Resp(
         payload={"results": [_work("Suicide prevention competencies among Muslim faith leaders", "2501.00001")]}))
     assert cr._search_openalex("Attention is all you need") is None
     assert not fetched  # title guard fired before any fetch
@@ -41,7 +41,7 @@ def test_openalex_rejects_mismatched_title(monkeypatch):
 def test_openalex_follows_arxiv_location_on_match(monkeypatch):
     monkeypatch.setattr(cr, "_rate_limit", lambda: None)
     monkeypatch.setattr(cr, "_fetch_arxiv", lambda aid: f"full text of {aid}")
-    monkeypatch.setattr(cr.requests, "get", lambda url, **kw: _Resp(
+    monkeypatch.setattr(cr, "public_get", lambda url, **kw: _Resp(
         payload={"results": [_work("Attention Is All You Need", "1706.03762")]}))
     assert cr._search_openalex("Attention is all you need") == "full text of 1706.03762"
 
@@ -49,14 +49,14 @@ def test_openalex_follows_arxiv_location_on_match(monkeypatch):
 def test_openalex_ignores_match_without_arxiv_location(monkeypatch):
     monkeypatch.setattr(cr, "_rate_limit", lambda: None)
     monkeypatch.setattr(cr, "_fetch_arxiv", lambda aid: "text")
-    monkeypatch.setattr(cr.requests, "get", lambda url, **kw: _Resp(
+    monkeypatch.setattr(cr, "public_get", lambda url, **kw: _Resp(
         payload={"results": [_work("Attention Is All You Need")]}))  # venue-only
     assert cr._search_openalex("Attention is all you need") is None
 
 
 def test_openalex_non_200_returns_none(monkeypatch):
     monkeypatch.setattr(cr, "_rate_limit", lambda: None)
-    monkeypatch.setattr(cr.requests, "get", lambda url, **kw: _Resp(status_code=429))
+    monkeypatch.setattr(cr, "public_get", lambda url, **kw: _Resp(status_code=429))
     assert cr._search_openalex("Attention is all you need") is None
 
 

@@ -24,7 +24,7 @@ def test_default_policy_makes_one_backoff_retry(monkeypatch):
     calls = []
     sleeps = []
     _set_attempts(monkeypatch, cr._DEFAULT_REQUEST_ATTEMPTS)
-    monkeypatch.setattr(cr.requests, "get", lambda *a, **k: calls.append(1) or _Resp(429))
+    monkeypatch.setattr(cr, "public_get", lambda *a, **k: calls.append(1) or _Resp(429))
     monkeypatch.setattr(cr._time, "sleep", sleeps.append)
 
     response = cr._get_with_backoff("https://example.test")
@@ -38,7 +38,7 @@ def test_default_policy_makes_one_backoff_retry(monkeypatch):
 def test_patient_policy_allows_ten_backoff_retries(monkeypatch):
     calls = []
     _set_attempts(monkeypatch, cr._PATIENT_REQUEST_ATTEMPTS)
-    monkeypatch.setattr(cr.requests, "get", lambda *a, **k: calls.append(1) or _Resp(429))
+    monkeypatch.setattr(cr, "public_get", lambda *a, **k: calls.append(1) or _Resp(429))
     monkeypatch.setattr(cr._time, "sleep", lambda _: None)
 
     response = cr._get_with_backoff("https://example.test")
@@ -55,7 +55,7 @@ def test_patient_policy_can_recover_on_last_attempt(monkeypatch):
         calls.append(1)
         return _Resp(200 if len(calls) == 11 else 429)
 
-    monkeypatch.setattr(cr.requests, "get", get)
+    monkeypatch.setattr(cr, "public_get", get)
     monkeypatch.setattr(cr._time, "sleep", lambda _: None)
 
     assert cr._get_with_backoff("https://example.test").status_code == 200
@@ -67,7 +67,7 @@ def test_uses_bounded_retry_after(monkeypatch):
     responses = iter([_Resp(429, {"Retry-After": "30"}), _Resp(200)])
     sleeps = []
     _set_attempts(monkeypatch, cr._DEFAULT_REQUEST_ATTEMPTS)
-    monkeypatch.setattr(cr.requests, "get", lambda *a, **k: next(responses))
+    monkeypatch.setattr(cr, "public_get", lambda *a, **k: next(responses))
     monkeypatch.setattr(cr._time, "sleep", sleeps.append)
 
     assert cr._get_with_backoff("https://example.test").status_code == 200
@@ -77,7 +77,7 @@ def test_uses_bounded_retry_after(monkeypatch):
 def test_does_not_retry_permanent_error(monkeypatch):
     calls = []
     _set_attempts(monkeypatch, cr._DEFAULT_REQUEST_ATTEMPTS)
-    monkeypatch.setattr(cr.requests, "get", lambda *a, **k: calls.append(1) or _Resp(404))
+    monkeypatch.setattr(cr, "public_get", lambda *a, **k: calls.append(1) or _Resp(404))
     monkeypatch.setattr(cr._time, "sleep", lambda _: (_ for _ in ()).throw(AssertionError("slept")))
 
     assert cr._get_with_backoff("https://example.test").status_code == 404
@@ -95,7 +95,7 @@ def test_retries_request_exception_then_returns_success(monkeypatch):
             raise cr.requests.Timeout("timed out")
         return _Resp(200)
 
-    monkeypatch.setattr(cr.requests, "get", get)
+    monkeypatch.setattr(cr, "public_get", get)
     monkeypatch.setattr(cr._time, "sleep", sleeps.append)
 
     assert cr._get_with_backoff("https://example.test").status_code == 200

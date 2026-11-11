@@ -129,11 +129,10 @@ def _parse_pdf(path: str) -> str:
 def _fetch_url(url: str) -> str:
     """Fetch and extract text from a web page."""
     try:
-        import requests
-        from bs4 import BeautifulSoup
-        
+        from web.public_http import get as public_get
+
         headers = {"User-Agent": "Mozilla/5.0 HVE/1.0"}
-        resp = requests.get(url, headers=headers, timeout=15)
+        resp = public_get(url, headers=headers, timeout=15)
         resp.raise_for_status()
         return _extract_text_from_html(resp.text)
     except ImportError:
@@ -691,7 +690,8 @@ def search_pubmed(query: str, max_results: int = 3) -> list:
     }
 
     try:
-        resp = requests.get(search_url, params=params, timeout=15)
+        from web.public_http import get as public_get
+        resp = public_get(search_url, params=params, timeout=15)
         data = resp.json()
         ids = data.get("esearchresult", {}).get("idlist", [])
     except Exception:
@@ -709,7 +709,8 @@ def search_pubmed(query: str, max_results: int = 3) -> list:
     }
 
     try:
-        resp = requests.get(fetch_url, params=params, timeout=15)
+        from web.public_http import get as public_get
+        resp = public_get(fetch_url, params=params, timeout=15)
         # M9 fix: use ElementTree to handle nested tags and CDATA
         # correctly. The previous regex approach broke on PubMed XML
         # where abstract sections can be split or have inner markup.
