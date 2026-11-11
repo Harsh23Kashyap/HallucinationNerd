@@ -17,7 +17,7 @@ def test_unpaywall_email_from_env(monkeypatch):
     importlib.reload(cr)
     # _fetch_doi reads os.getenv("UNPAYWALL_EMAIL") at call time, so
     # monkeypatching the env is sufficient — no need to reload.
-    monkeypatch.setattr("web.citation_resolver.requests.get", lambda *a, **kw: None)
+    monkeypatch.setattr("web.citation_resolver.public_get", lambda *a, **kw: None)
     # Just verify the env var is read; full fetch is exercised by the
     # citation_resolver end-to-end test (out of scope here).
     assert os.getenv("UNPAYWALL_EMAIL") == "real-researcher@example.org"

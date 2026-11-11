@@ -48,7 +48,7 @@ def test_pubmed_fallback_rejects_mismatched_title(monkeypatch):
             return _Resp(text="abstract that should never be fetched " * 5)
         raise AssertionError(f"unexpected url {url}")
 
-    monkeypatch.setattr(cr.requests, "get", fake_get)
+    monkeypatch.setattr(cr, "public_get", fake_get)
     assert cr._search_and_fetch("Attention is all you need") is None
     assert not any("efetch" in u for u in calls)  # abstract never fetched
 
@@ -67,7 +67,7 @@ def test_pubmed_fallback_accepts_matched_title(monkeypatch):
             return _Resp(text="Peters et al. Deep contextualized word representations. " * 5)
         raise AssertionError(f"unexpected url {url}")
 
-    monkeypatch.setattr(cr.requests, "get", fake_get)
+    monkeypatch.setattr(cr, "public_get", fake_get)
     out = cr._search_and_fetch("Deep contextualized word representations")
     assert out is not None and "Deep contextualized word representations" in out
 
@@ -85,7 +85,7 @@ def test_pubmed_fallback_fails_open_when_title_lookup_fails(monkeypatch):
             return _Resp(text="Some biomedical abstract content here. " * 5)
         raise AssertionError(f"unexpected url {url}")
 
-    monkeypatch.setattr(cr.requests, "get", fake_get)
+    monkeypatch.setattr(cr, "public_get", fake_get)
     assert cr._search_and_fetch("Some biomedical study") is not None
 
 
@@ -99,7 +99,7 @@ def test_semantic_scholar_rejects_mismatched_title(monkeypatch):
             "abstract": "Unrelated biomedical abstract.",
             "externalIds": {}}]})
 
-    monkeypatch.setattr(cr.requests, "get", fake_get)
+    monkeypatch.setattr(cr, "public_get", fake_get)
     assert cr._search_semantic_scholar(
         "Improving language understanding by generative pre-training") is None
 
@@ -114,7 +114,7 @@ def test_semantic_scholar_accepts_matched_title(monkeypatch):
             "abstract": "The real abstract.",
             "externalIds": {}}]})
 
-    monkeypatch.setattr(cr.requests, "get", fake_get)
+    monkeypatch.setattr(cr, "public_get", fake_get)
     out = cr._search_semantic_scholar("Improving language understanding by generative pre-training")
     assert out is not None and "The real abstract." in out
 

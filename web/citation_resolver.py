@@ -29,6 +29,11 @@ _S2_API_KEY = os.getenv("SEMANTIC_SCHOLAR_API_KEY", "")
 # Simple in-memory cache for resolved sources. Entries expire after
 # `_CACHE_TTL_SECONDS` so stale arXiv versions and rate-limited Unpaywall
 # responses don't stick forever.
+try:
+    from web.public_http import get as public_get, DestinationBlocked
+except ImportError:
+    from public_http import get as public_get, DestinationBlocked
+
 import time as _time
 _source_cache: dict = {}  # cache_key -> (timestamp, content)
 _CACHE_TTL_SECONDS = 3600  # 1 hour default; override with HVE_CACHE_TTL
@@ -74,7 +79,10 @@ def _get_with_backoff(url: str, **kwargs):
     for attempt in range(attempts):
         _rate_limit()
         try:
-            response = requests.get(url, **kwargs)
+            response = public_get(url, **kwargs)
+        except DestinationBlocked:
+            _request_policy.throttled = False
+            return None
         except requests.RequestException:
             response = None
 
