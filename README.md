@@ -182,3 +182,12 @@ python statistical_tests/Diff2MeanConf.py   # bootstrap confidence interval
 - **Harsh Kashyap** — Thapar Institute of Engineering and Technology, Patiala, India
 - **Vishnu Chennur** — Downingtown STEM Academy, Downingtown, PA, USA
 - **Dennis Shasha** — Department of Computer Science, New York University, New York, USA
+
+### Offline machine-readable review bundles
+
+Package an existing `/verify` JSON report for offline review with
+`tools/review_bundle.py`. The bundle preserves report fields and derives
+source-label linkage; hash checking is integrity consistency, not authenticity,
+actual retrieval provenance or evidence that a claim is true. It includes
+private text, so review before sharing. See
+[the CLI and limits](docs/PORTABLE_REVIEW_BUNDLE.md).
