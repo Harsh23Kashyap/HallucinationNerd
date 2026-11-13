@@ -119,6 +119,14 @@ async function runVerification(patientWait) {
             return;
         }
 
+        if (!response.ok) {
+            const message = typeof data.detail === 'string' && data.detail.trim()
+                ? data.detail
+                : `Verification failed (HTTP ${response.status}). Please try again.`;
+            showError(message);
+            return;
+        }
+
         renderResults(data);
         if (data.retry_offer) retryOffer.classList.remove('hidden');
     } catch (err) {
