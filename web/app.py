@@ -41,11 +41,20 @@ import time as _time
 _rate_limit_requests = int(os.getenv("HVE_RATE_LIMIT_REQUESTS", "5"))
 _rate_limit_window = int(os.getenv("HVE_RATE_LIMIT_WINDOW_SECONDS", "60"))
 _rate_buckets: dict = {}  # ip -> [timestamps]
+_rate_next_prune = 0.0
 
 
 def _check_rate_limit(ip: str) -> bool:
     """Returns True if the request is allowed, False if rate-limited."""
-    now = _time.time()
+    global _rate_next_prune
+    now = _time.monotonic()
+    if now >= _rate_next_prune:
+        # Sweep once per window, rather than scanning every IP on every request.
+        expired = [key for key, stamps in _rate_buckets.items()
+                   if not stamps or now - stamps[-1] >= _rate_limit_window]
+        for key in expired:
+            del _rate_buckets[key]
+        _rate_next_prune = now + max(1, _rate_limit_window)
     bucket = _rate_buckets.get(ip, [])
     # Drop timestamps outside the window
     bucket = [t for t in bucket if now - t < _rate_limit_window]
