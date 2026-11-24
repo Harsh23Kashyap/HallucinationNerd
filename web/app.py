@@ -101,6 +101,7 @@ async def verify_document(
     custom_database: str = Form(default=""),
     patient_wait: bool = Form(default=False),
     references: List[UploadFile] = File(default=[]),
+    verification_mode: str = Form(default="claim_support"),
 ):
     """
     Accept a document upload, extract claims + citations, verify each one.
@@ -112,7 +113,12 @@ async def verify_document(
     Returns JSON with per-claim results.
     """
     from verify_hallucinations import llm_config_error, private_mode, offline_mode
-    problem = llm_config_error()
+    if verification_mode not in {"claim_support", "citation_existence"}:
+        raise HTTPException(status_code=400, detail="Unsupported verification_mode")
+    existence_only = verification_mode == "citation_existence"
+    if existence_only and (databases.strip() or custom_database.strip() or references or patient_wait):
+        raise HTTPException(status_code=400, detail="ID screening does not accept backup searches, reference files or patient retries")
+    problem = None if existence_only else llm_config_error()
     if problem:
         raise HTTPException(status_code=500, detail=f"Server misconfigured: {problem}")
     if (private_mode() or offline_mode()) and (databases.strip() or custom_database.strip()):
@@ -132,7 +138,7 @@ async def verify_document(
 
     # L24: enforce a max upload size to prevent abuse. Default 25 MB.
     max_bytes = int(os.getenv("HVE_MAX_UPLOAD_BYTES", "26214400"))
-    content_bytes = await file.read()
+    content_bytes = await file.read(max_bytes + 1)
     if len(content_bytes) > max_bytes:
         raise HTTPException(
             status_code=413,
@@ -140,6 +146,8 @@ async def verify_document(
         )
     filename = file.filename or "uploaded_file"
     suffix = Path(filename).suffix.lower()
+    if existence_only and suffix not in {".pdf", ".txt", ".md", ".html", ".htm", ".json"}:
+        raise HTTPException(status_code=400, detail="Unsupported document format for ID screening")
 
     uploaded_refs = []
     total = len(content_bytes)
@@ -158,15 +166,43 @@ async def verify_document(
 
     db_list = [d.strip() for d in databases.split(",") if d.strip()]
     try:
+        if existence_only:
+            # Keep all document/model and source-PDF machinery out of this branch.
+            from web.citation_existence import screen_document
+            import threading
+            cancel = threading.Event()
+            worker = asyncio.create_task(asyncio.to_thread(
+                screen_document, tmp_path, filename, suffix, offline=offline_mode(), cancel=cancel))
+            try:
+                while not worker.done():
+                    if await request.is_disconnected():
+                        cancel.set()
+                    await asyncio.sleep(0.05)
+                return JSONResponse(content=await worker)
+            finally:
+                cancel.set()
+                # A thread cannot be killed. Wait for bounded I/O to finish before
+                # removing its input file, including when the ASGI task is cancelled.
+                try:
+                    await asyncio.shield(worker)
+                except asyncio.CancelledError:
+                    worker.add_done_callback(lambda _, path=tmp_path: Path(path).unlink(missing_ok=True))
+                    tmp_path = None
+                    raise
         results = await asyncio.to_thread(
             _run_verification, tmp_path, filename, suffix, source_type, db_list, custom_database.strip(), patient_wait,
             uploaded_refs,
         )
         return JSONResponse(content=results)
+    except ValueError as e:
+        if existence_only:
+            return JSONResponse(content={"error": str(e)}, status_code=400)
+        return JSONResponse(content={"error": str(e)}, status_code=500)
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
     finally:
-        os.unlink(tmp_path)
+        if tmp_path:
+            os.unlink(tmp_path)
 
 
 def _extract_clause_for_ref(claim_text: str, ref_key: str) -> Optional[str]:

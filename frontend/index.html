@@ -37,6 +37,14 @@
 
             <form id="uploadForm">
                 <div class="form-section">
+                    <label class="section-label" for="verificationMode">Check type</label>
+                    <div class="select-wrap"><select id="verificationMode" name="verification_mode">
+                        <option value="claim_support" selected>Check whether sources support claims</option>
+                        <option value="citation_existence">Check citation IDs first (arXiv only)</option>
+                    </select></div>
+                    <p class="section-hint" id="modeExplanation">Full check: extracts claims and may retrieve cited papers and use the configured model. Private/offline server settings still apply.</p>
+                </div>
+                <div class="form-section">
                     <label class="section-label" for="sourceType"><span class="num">01</span> Document format</label>
                     <div class="select-wrap">
                         <select name="source_type" id="sourceType">
@@ -101,12 +109,13 @@
         <!-- RIGHT: results -->
         <div class="stage">
             <div class="stage-head">
-                <h2>Verification Results</h2>
+                <h2 id="resultsTitle">Verification Results</h2>
                 <span id="doneFlag" class="done-flag hidden">✓ Analysis complete</span>
                 <span class="legend">claim · source · verdict · evidence</span>
             </div>
 
             <!-- Empty state -->
+            <section id="existenceResults" class="hidden" aria-live="polite"></section>
             <div id="emptyState" class="empty-state">
                 <div class="motif" aria-hidden="true">[ <b>&#10003;</b> ]</div>
                 <p class="title">Ready for analysis</p>

@@ -57,7 +57,49 @@ patientRetryBtn.addEventListener('click', async () => {
     await runVerification(true);
 });
 
+const verificationMode = document.getElementById('verificationMode');
+verificationMode.addEventListener('change', () => {
+    const idsOnly = verificationMode.value === 'citation_existence';
+    document.getElementById('modeExplanation').textContent = idsOnly
+        ? 'Only supported arXiv IDs are sent for metadata lookup. No model, source PDF, title search, bibliography identity or claim support check. Offline mode makes no lookup. Unsupported or missing references remain Unknown.'
+        : 'Full check: extracts claims and may retrieve cited papers and use the configured model. Private/offline server settings still apply.';
+    document.querySelectorAll('.dbCheck, #customDatabase, #refInput').forEach(el => { el.disabled = idsOnly; });
+    submitBtn.textContent = idsOnly ? 'Check citation IDs' : 'Check claim support';
+});
+
+function renderExistenceResults(data) {
+    currentReport = data;
+    document.getElementById('resultsTitle').textContent = 'Citation ID screening';
+    document.querySelector('.stage-head .legend').textContent = '';
+    const box = document.getElementById('existenceResults');
+    box.replaceChildren();
+    box.classList.remove('hidden');
+    const add = (tag, text, parent = box) => {
+        const el = document.createElement(tag); el.textContent = text; parent.appendChild(el); return el;
+    };
+    add('h2', 'Citation ID screening only');
+    add('p', 'Claim support: not checked. Bibliography identity: not checked. An existing ID can still cite the wrong paper.');
+    add('p', `${data.summary.identifier_exists} identifier occurrences exist; ${data.summary.unknown} unknown out of ${data.summary.total_rows} parsed source rows. No hallucination verdict.`);
+    add('p', `Coverage: ${data.coverage_basis.replaceAll('_', ' ')}. ${data.requests_made} metadata requests. ${data.offline ? 'Offline: no external lookup.' : 'Only public IDs used for lookup.'}`);
+    (data.extraction_warnings || []).forEach(w => add('p', w));
+    const list = add('ol', '');
+    (data.rows || []).forEach(row => {
+        const item = add('li', `${row.marker}: ${row.arxiv_id || 'Unsupported or missing ID'}: ${row.status === 'IDENTIFIER_EXISTS' ? 'Identifier exists' : 'Unknown'} (${row.reason.replaceAll('_', ' ')}). Claim support: not checked. Bibliography identity: not checked.`, list);
+        if (row.title) add('p', `Metadata title: ${row.title}`, item);
+        if (row.looked_up_at) add('p', `Metadata checked: ${row.looked_up_at}${row.cache_hit ? ' (cached)' : ''}`, item);
+    });
+    const deeper = add('button', 'Choose a separate claim-support check');
+    deeper.type = 'button'; deeper.className = 'review-btn';
+    deeper.addEventListener('click', () => {
+        verificationMode.value = 'claim_support'; verificationMode.dispatchEvent(new Event('change'));
+        add('p', 'Full check selected. Review its model/network scope, then press Check claim support to start.');
+        submitBtn.focus();
+    });
+}
+
 async function runVerification(patientWait) {
+    const idsOnly = verificationMode.value === 'citation_existence';
+    document.getElementById('existenceResults').classList.add('hidden');
 
     if (!fileInput.files.length) {
         showError('Please select a file to upload.');
@@ -79,7 +121,9 @@ async function runVerification(patientWait) {
 
     // Animated progress messages
     const loadingMsg = document.getElementById('loadingMsg');
-    const stages = [
+    loadingState.querySelector('.title').textContent = idsOnly ? 'Screening citation IDs...' : 'Checking claim support...';
+    loadingState.querySelector('.hint').textContent = idsOnly ? 'No claim-support check is running. Metadata lookup has a bounded time budget.' : 'This can take 1-2 minutes for papers with many citations.';
+    const stages = idsOnly ? ['Reading the bibliography...', 'Looking up supported arXiv IDs only...'] : [
         'Extracting text from the document...',
         'Identifying claims and their citations...',
         'Resolving the cited references...',
@@ -87,6 +131,7 @@ async function runVerification(patientWait) {
         'Checking each claim against its cited source...',
         'Still working — larger papers can take 1–2 minutes...',
     ];
+    loadingMsg.textContent = stages[0];
     let stageIdx = 0;
     const progressInterval = setInterval(() => {
         if (stageIdx < stages.length) {
@@ -97,11 +142,12 @@ async function runVerification(patientWait) {
 
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
+    formData.append('verification_mode', verificationMode.value);
     formData.append('source_type', document.getElementById('sourceType').value);
     const selectedDbs = [...document.querySelectorAll('.dbCheck:checked')].map(c => c.value);
-    formData.append('databases', selectedDbs.join(','));
-    formData.append('custom_database', document.getElementById('customDatabase').value.trim());
-    formData.append('patient_wait', patientWait ? 'true' : 'false');
+    formData.append('databases', idsOnly ? '' : selectedDbs.join(','));
+    formData.append('custom_database', idsOnly ? '' : document.getElementById('customDatabase').value.trim());
+    formData.append('patient_wait', !idsOnly && patientWait ? 'true' : 'false');
 
     try {
         const apiBase = (window.env && window.env.API_URL) ? window.env.API_URL : '';
@@ -112,11 +158,15 @@ async function runVerification(patientWait) {
         loadingState.classList.add('hidden');
         submitBtn.disabled = false;
 
-        if (data.error) {
-            showError(data.error);
+        if (!response.ok || data.error) {
+            showError(data.error || data.detail || "Request failed");
             return;
         }
 
+        if (data.verification_mode === 'citation_existence') {
+            renderExistenceResults(data);
+            return;
+        }
         renderResults(data);
         if (data.retry_offer) retryOffer.classList.remove('hidden');
     } catch (err) {
@@ -133,6 +183,9 @@ function showError(msg) {
 }
 
 function renderResults(data) {
+    document.getElementById('existenceResults').classList.add('hidden');
+    document.getElementById('resultsTitle').textContent = 'Verification Results';
+    document.querySelector('.stage-head .legend').textContent = 'claim · source · verdict · evidence';
     const s = data.summary;
     currentReport = data;
     reviewOrder = 'document';
